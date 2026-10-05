@@ -24,7 +24,7 @@ COPY flutter/ flutter/
 COPY scripts/build-flutter.sh scripts/build-flutter.sh
 RUN bash scripts/build-flutter.sh
 
-FROM rust:1.88-slim-trixie AS backend
+FROM rust:1.98-slim-trixie AS backend
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src/ src/

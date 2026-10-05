@@ -31,7 +31,7 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.47.6"
-  RUST_VERSION: "1.88.0"
+  RUST_VERSION: "stable"
   MIN_COVERAGE: "85"
 
 concurrency:
@@ -86,7 +86,7 @@ jobs:
           fetch-tags: true
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.88.0
+        uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
@@ -179,7 +179,7 @@ jobs:
           path: frontend/dist/
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.88.0
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
