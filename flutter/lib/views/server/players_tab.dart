@@ -34,37 +34,26 @@ class _PlayersTabState extends State<PlayersTab>
   }
 
   Future<void> _loadAll() async {
+    Object? err;
     for (final k in _lists.keys) {
       try {
         _lists[k] = await api.listPlayers(widget.server.id, k);
-      } catch (_) {}
+      } catch (e) {
+        err ??= e;
+      }
     }
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (err != null) showError(context, err);
+    setState(() {});
   }
 
   Future<void> _add(String list) async {
-    final c = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Add to $list'),
-        content: TextField(
-            controller: c,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Player name')),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, c.text.trim()),
-              child: const Text('Add')),
-        ],
-      ),
-    );
+    final name = await promptText(context,
+        title: 'Add to $list', label: 'Player name', confirmLabel: 'Add');
     if (name == null || name.isEmpty) return;
     try {
       _lists[list] = await api.addPlayer(widget.server.id, list, name);
-      setState(() {});
+      if (mounted) setState(() {});
     } catch (e) {
       if (mounted) showError(context, e);
     }
@@ -73,7 +62,7 @@ class _PlayersTabState extends State<PlayersTab>
   Future<void> _remove(String list, String name) async {
     try {
       _lists[list] = await api.removePlayer(widget.server.id, list, name);
-      setState(() {});
+      if (mounted) setState(() {});
     } catch (e) {
       if (mounted) showError(context, e);
     }
@@ -157,7 +146,10 @@ class _PlayersTabState extends State<PlayersTab>
                     return ListTile(
                       dense: true,
                       leading: CircleAvatar(
-                          radius: 14, child: Text(p.name[0].toUpperCase())),
+                          radius: 14,
+                          child: Text(p.name.isEmpty
+                              ? '?'
+                              : p.name[0].toUpperCase())),
                       title: Text(p.name),
                       subtitle: p.reason != null ? Text(p.reason!) : null,
                       trailing: IconButton(

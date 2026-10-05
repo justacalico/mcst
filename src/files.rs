@@ -38,17 +38,21 @@ pub fn safe_join(root: &Path, rel: &str) -> Result<PathBuf, ApiError> {
             _ => return Err(ApiError::bad_request("path escapes the server directory")),
         }
     }
-    // Canonicalize the parent to catch symlink escapes where possible.
+    // Resolve the deepest existing ancestor — a symlink anywhere in the chain
+    // must not smuggle writes outside the server root.
     if let Ok(canon_root) = root.canonicalize() {
-        let probe = if out.exists() {
-            out.canonicalize().ok()
-        } else {
-            out.parent()
-                .and_then(|p| p.canonicalize().ok())
-                .map(|p| p.join(out.file_name().unwrap_or_default()))
+        let mut ancestor = out.as_path();
+        let real = loop {
+            if let Ok(c) = ancestor.canonicalize() {
+                break Some(c);
+            }
+            match ancestor.parent() {
+                Some(p) => ancestor = p,
+                None => break None,
+            }
         };
-        if let Some(p) = probe {
-            if !p.starts_with(&canon_root) {
+        if let Some(real) = real {
+            if !real.starts_with(&canon_root) {
                 return Err(ApiError::bad_request("path escapes the server directory"));
             }
         }
@@ -201,6 +205,24 @@ mod tests {
         assert!(safe_join(root, "a\0b").is_err());
         // Absolute path components get rejected (Component::RootDir).
         assert!(safe_join(root, "C:\\x").is_ok()); // windows path is just a name on unix
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn safe_join_blocks_symlink_escape() {
+        let d = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        // A symlink planted inside the root pointing outside it.
+        std::os::unix::fs::symlink(outside.path(), d.path().join("link")).unwrap();
+        // Existing leaf through the symlink — caught.
+        std::fs::write(outside.path().join("evil.txt"), b"x").unwrap();
+        assert!(safe_join(d.path(), "link/evil.txt").is_err());
+        // Non-existent leaf through the symlink — caught via deepest
+        // existing ancestor (this was the old parent-only check's hole).
+        assert!(safe_join(d.path(), "link/sub/new.txt").is_err());
+        // A normal nested path still works.
+        std::fs::create_dir_all(d.path().join("ok/deep")).unwrap();
+        assert!(safe_join(d.path(), "ok/deep/f.txt").is_ok());
     }
 
     #[tokio::test]

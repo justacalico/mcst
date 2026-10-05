@@ -28,14 +28,19 @@ class _SchedulesTabState extends State<SchedulesTab> {
   }
 
   Future<void> _load() async {
+    Object? err;
     try {
       _items = await api.listSchedules(widget.server.id);
-    } catch (_) {}
-    if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      err = e;
+    }
+    if (!mounted) return;
+    if (err != null) showError(context, err);
+    setState(() => _loading = false);
   }
 
   Future<void> _edit([Schedule? existing]) async {
-    final result = await showDialog<Schedule>(
+    final result = await showDialog<bool>(
         context: context,
         builder: (_) =>
             _ScheduleDialog(existing: existing, serverId: widget.server.id));
@@ -186,7 +191,7 @@ class _ScheduleDialogState extends State<_ScheduleDialog> {
       } else {
         await api.updateSchedule(widget.serverId, widget.existing!.id, body);
       }
-      if (mounted) Navigator.pop(context, widget.existing);
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) showError(context, e);
     }

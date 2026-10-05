@@ -20,6 +20,7 @@ pub async fn list(
     for m in managed {
         if !installs.iter().any(|j| j.path == m.path) {
             installs.push(crate::java::JavaInstall {
+                id: m.id,
                 path: m.path,
                 major: m.major as u32,
                 version: String::new(),

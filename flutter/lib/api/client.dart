@@ -157,7 +157,7 @@ class HttpApiClient implements ApiClient {
 
   Uri _ws(String path) {
     final s = base.scheme == 'https' ? 'wss' : 'ws';
-    return base.replace(scheme: s, path: '/api$path', query: '');
+    return base.replace(scheme: s, path: '/api$path', query: '', fragment: '');
   }
 
   Never _fail(http.Response r) {
@@ -172,7 +172,11 @@ class HttpApiClient implements ApiClient {
   Future<Map<String, dynamic>> _get(String path, [Map<String, String>? q]) async {
     final r = await _http.get(_u(path, q));
     if (r.statusCode >= 400) _fail(r);
-    return jsonDecode(r.body) as Map<String, dynamic>;
+    final j = jsonDecode(r.body);
+    if (j is! Map<String, dynamic>) {
+      throw ApiException(r.statusCode, 'unexpected response body');
+    }
+    return j;
   }
 
   Future<Map<String, dynamic>> _send(
@@ -186,7 +190,11 @@ class HttpApiClient implements ApiClient {
     final r = await http.Response.fromStream(streamed);
     if (r.statusCode >= 400) _fail(r);
     if (r.body.isEmpty) return const {};
-    return jsonDecode(r.body) as Map<String, dynamic>;
+    final j = jsonDecode(r.body);
+    if (j is! Map<String, dynamic>) {
+      throw ApiException(r.statusCode, 'unexpected response body');
+    }
+    return j;
   }
 
   Future<Map<String, dynamic>> _post(String path, [Object? body]) =>

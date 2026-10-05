@@ -32,6 +32,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
   final _memory = TextEditingController(text: '4096');
   final _jvmArgs = TextEditingController();
   bool _eula = false;
+  int _pickSeq = 0;
 
   bool _loading = false;
   String? _error;
@@ -59,6 +60,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
   }
 
   Future<void> _pickType(String t) async {
+    final seq = ++_pickSeq;
     setState(() {
       _type = t;
       _version = null;
@@ -68,13 +70,14 @@ class _CreateServerPageState extends State<CreateServerPage> {
     });
     try {
       final v = await api.mcVersions(t);
-      setState(() => _versions = v);
+      if (seq == _pickSeq && mounted) setState(() => _versions = v);
     } catch (e) {
-      setState(() => _error = '$e');
+      if (seq == _pickSeq && mounted) setState(() => _error = '$e');
     }
   }
 
   Future<void> _pickVersion(String v) async {
+    final seq = ++_pickSeq;
     setState(() {
       _version = v;
       _loader = null;
@@ -83,6 +86,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
     try {
       final l = await api.loaders(_type!, v);
       final req = await api.requiredJava(v);
+      if (seq != _pickSeq || !mounted) return;
       setState(() {
         _loaders = l;
         _loader = l.isEmpty ? null : l.first;
@@ -90,7 +94,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
         _javaPath = _suggestJava(req);
       });
     } catch (e) {
-      setState(() => _error = '$e');
+      if (seq == _pickSeq && mounted) setState(() => _error = '$e');
     }
   }
 
@@ -134,6 +138,8 @@ class _CreateServerPageState extends State<CreateServerPage> {
           builder: (_) => ServerDetailPage(serverId: s.id)));
     } catch (e) {
       setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -229,14 +235,23 @@ class _CreateServerPageState extends State<CreateServerPage> {
           _name.text.trim().isNotEmpty &&
               (int.tryParse(_port.text) ?? 0) >= 1024 &&
               (int.tryParse(_memory.text) ?? 0) >= 256 &&
-              _eula,
+              (_eula || _type == 'custom'),
         _ => true,
       };
 
   void _next() {
     if (!_canContinue()) {
-      if (_step == 2 && !_eula) {
-        setState(() => _error = 'You must accept the Minecraft EULA');
+      if (_step == 2) {
+        final port = int.tryParse(_port.text) ?? 0;
+        final mem = int.tryParse(_memory.text) ?? 0;
+        final msg = _name.text.trim().isEmpty
+            ? 'Name the server'
+            : port < 1024
+                ? 'Port must be 1024-65535'
+                : mem < 256
+                    ? 'Memory must be at least 256 MiB'
+                    : 'You must accept the Minecraft EULA';
+        setState(() => _error = msg);
       }
       return;
     }
@@ -288,6 +303,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
     if (_loaders.isNotEmpty) {
       widgets.add(const SizedBox(height: 12));
       widgets.add(DropdownMenu<String>(
+        key: ValueKey('loader-$_loader'),
         label: const Text('Loader / build'),
         initialSelection: _loader,
         dropdownMenuEntries: [
@@ -325,6 +341,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
         ]),
         const SizedBox(height: 12),
         DropdownMenu<String>(
+          key: ValueKey('java-$_javaPath'),
           label: Text('Java (needs Java $_requiredJava+)'),
           expandedInsets: EdgeInsets.zero,
           initialSelection: _javaPath.isEmpty ? null : _javaPath,
@@ -345,14 +362,16 @@ class _CreateServerPageState extends State<CreateServerPage> {
                 labelText: 'JVM flags (optional)',
                 hintText: '-XX:+UseG1GC -XX:+ParallelRefProcEnabled')),
         const SizedBox(height: 12),
-        CheckboxListTile(
-          value: _eula,
-          onChanged: (v) => setState(() => _eula = v ?? false),
-          title: const Text('I accept the Minecraft EULA'),
-          subtitle: const Text('minecraft.net/eula'),
-          controlAffinity: ListTileControlAffinity.leading,
-          contentPadding: EdgeInsets.zero,
-        ),
+        // Custom servers install whatever jar the user drops — no EULA.
+        if (_type != 'custom')
+          CheckboxListTile(
+            value: _eula,
+            onChanged: (v) => setState(() => _eula = v ?? false),
+            title: const Text('I accept the Minecraft EULA'),
+            subtitle: const Text('minecraft.net/eula'),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+          ),
       ],
     );
   }

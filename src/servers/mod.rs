@@ -50,10 +50,14 @@ pub struct Runtime {
     crash_restarts: AtomicU32,
     /// Set when a stop was requested by the user — suppresses crash restart.
     manual_stop: std::sync::atomic::AtomicBool,
+    /// Serializes status check + spawn so two starts can't race.
+    start_lock: Mutex<()>,
+    /// Panel event bus (status transitions, stats, players).
+    events: broadcast::Sender<PanelEvent>,
 }
 
 impl Runtime {
-    fn new(record: ServerRecord) -> Self {
+    fn new(record: ServerRecord, events: broadcast::Sender<PanelEvent>) -> Self {
         let (log_tx, _) = broadcast::channel(512);
         Self {
             record: RwLock::new(record),
@@ -70,6 +74,8 @@ impl Runtime {
             last_nonempty: RwLock::new(Instant::now()),
             crash_restarts: AtomicU32::new(0),
             manual_stop: std::sync::atomic::AtomicBool::new(false),
+            start_lock: Mutex::new(()),
+            events,
         }
     }
 
@@ -189,11 +195,11 @@ impl ServerManager {
 
     /// Load or create the runtime for a server id.
     pub async fn runtime(&self, id: &str) -> Result<Arc<Runtime>> {
-        {
-            let rts = self.inner.runtimes.lock().await;
-            if let Some(rt) = rts.get(id) {
-                return Ok(rt.clone());
-            }
+        // Hold the lock across the load+insert so racing callers share one
+        // Runtime instance.
+        let mut rts = self.inner.runtimes.lock().await;
+        if let Some(rt) = rts.get(id) {
+            return Ok(rt.clone());
         }
         let rec = self
             .inner
@@ -201,12 +207,8 @@ impl ServerManager {
             .get_server(id)
             .await?
             .ok_or_else(|| anyhow!("server not found"))?;
-        let rt = Arc::new(Runtime::new(rec));
-        self.inner
-            .runtimes
-            .lock()
-            .await
-            .insert(id.to_string(), rt.clone());
+        let rt = Arc::new(Runtime::new(rec, self.inner.events.clone()));
+        rts.insert(id.to_string(), rt.clone());
         Ok(rt)
     }
 
@@ -270,6 +272,18 @@ impl ServerManager {
 
     async fn start_inner(&self, id: &str, manual: bool) -> Result<()> {
         let rt = self.runtime(id).await?;
+        // Serialize check + spawn: two concurrent starts (manual vs. crash
+        // supervisor) must not both launch a process.
+        let _guard = rt.start_lock.lock().await;
+        if manual {
+            rt.manual_stop.store(false, Ordering::SeqCst);
+            rt.crash_restarts.store(0, Ordering::SeqCst);
+        } else if rt.manual_stop.swap(false, Ordering::SeqCst) {
+            // The user stopped/killed the server while a crash restart was
+            // queued — honor it instead of reviving the process.
+            self.set_status(&rt, ServerStatus::Stopped).await;
+            return Ok(());
+        }
         if rt.status().await.is_active() {
             bail!("server is already running");
         }
@@ -283,11 +297,13 @@ impl ServerManager {
             bail!("server jar not found — the install may be incomplete");
         }
         self.set_status(&rt, ServerStatus::Starting).await;
-        if manual {
-            rt.manual_stop.store(false, Ordering::SeqCst);
-            rt.crash_restarts.store(0, Ordering::SeqCst);
+        if let Err(e) = self.spawn_process(rt.clone(), rec).await {
+            // Never leave a server stuck in `starting` — that state blocks
+            // every subsequent lifecycle action.
+            self.set_status(&rt, ServerStatus::Crashed).await;
+            return Err(e);
         }
-        self.spawn_process(rt.clone(), rec).await
+        Ok(())
     }
 
     async fn spawn_process(&self, rt: Arc<Runtime>, rec: ServerRecord) -> Result<()> {
@@ -304,6 +320,9 @@ impl ServerManager {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        // Own process group so kill() reaches java children too.
+        #[cfg(unix)]
+        cmd.process_group(0);
         // MCP/forge servers don't need a controlling terminal; plain pipes
         // give the most compatible stdin/stdout behavior on all platforms.
         let mut child = cmd
@@ -329,40 +348,22 @@ impl ServerManager {
         *rt.started_at.write().await = Some(Instant::now());
         rt.players.write().await.names.clear();
 
-        // Pump both output streams into the log.
-        let rt_out = rt.clone();
-        let mut out_lines = BufReader::new(stdout).lines();
-        let mut err_lines = BufReader::new(stderr).lines();
-        tokio::spawn(async move {
-            loop {
-                let line = tokio::select! {
-                    l = out_lines.next_line() => l,
-                    l = err_lines.next_line() => l,
-                };
-                match line {
-                    Ok(Some(l)) => {
-                        rt_out.handle_log_line(&l).await;
-                        rt_out.push_log(l).await;
-                    }
-                    Ok(None) => {
-                        // One stream closed; wait on the other one.
-                        let rest = if out_lines.next_line().await.ok().flatten().is_none() {
-                            err_lines.next_line().await
-                        } else {
-                            out_lines.next_line().await
-                        };
-                        match rest {
-                            Ok(Some(l)) => {
-                                rt_out.handle_log_line(&l).await;
-                                rt_out.push_log(l).await;
-                            }
-                            _ => break,
-                        }
-                    }
-                    Err(_) => break,
+        // Pump each output stream into the log independently — a closed
+        // stdout must not strand lines still arriving on stderr.
+        fn pump<T>(rt: Arc<Runtime>, stream: T)
+        where
+            T: tokio::io::AsyncRead + Unpin + Send + 'static,
+        {
+            tokio::spawn(async move {
+                let mut lines = BufReader::new(stream).lines();
+                while let Ok(Some(l)) = lines.next_line().await {
+                    rt.handle_log_line(&l).await;
+                    rt.push_log(l).await;
                 }
-            }
-        });
+            });
+        }
+        pump(rt.clone(), stdout);
+        pump(rt.clone(), stderr);
 
         // Reap the child and handle exit / crash restart.
         let mgr = self.clone();
@@ -375,6 +376,9 @@ impl ServerManager {
 
     /// Send a console command (stdin). Works for vanilla/modded servers.
     pub async fn send_command(&self, id: &str, cmd: &str) -> Result<()> {
+        if cmd.contains(['\n', '\r']) {
+            bail!("command must be a single line");
+        }
         let rt = self.runtime(id).await?;
         let mut guard = rt.stdin.lock().await;
         let stdin = guard
@@ -390,10 +394,11 @@ impl ServerManager {
     /// Graceful stop: send `stop`, wait `shutdown_timeout_sec`, then kill.
     pub async fn stop(&self, id: &str) -> Result<()> {
         let rt = self.runtime(id).await?;
+        // Mark manual intent first — also cancels a queued crash restart.
+        rt.manual_stop.store(true, Ordering::SeqCst);
         if !rt.status().await.is_active() {
             return Ok(());
         }
-        rt.manual_stop.store(true, Ordering::SeqCst);
         self.set_status(&rt, ServerStatus::Stopping).await;
         let timeout = rt.record.read().await.shutdown_timeout_sec.max(1) as u64;
         drop(self.send_command(id, "stop").await);
@@ -415,7 +420,8 @@ impl ServerManager {
     pub async fn kill(&self, id: &str) -> Result<()> {
         let rt = self.runtime(id).await?;
         rt.manual_stop.store(true, Ordering::SeqCst);
-        let pid = rt.child_pid.load(Ordering::SeqCst);
+        // Clear first to shrink the pid-reuse window before on_process_exit.
+        let pid = rt.child_pid.swap(0, Ordering::SeqCst);
         if pid != 0 {
             kill_pid(pid);
         }
@@ -656,6 +662,10 @@ impl Runtime {
             logparse::LogEvent::ServerReady => {
                 *self.status.write().await = ServerStatus::Running;
                 *self.last_nonempty.write().await = Instant::now();
+                let id = self.record.read().await.id.clone();
+                let _ = self
+                    .events
+                    .send(PanelEvent::status(&id, ServerStatus::Running));
             }
             logparse::LogEvent::Joined(name) => {
                 let mut p = self.players.write().await;
@@ -679,14 +689,17 @@ impl Runtime {
     }
 }
 
-/// Kill a pid cross-platform.
+/// Kill a server process group (children are spawned with their own pgid
+/// equal to the pid). Falls back to the bare pid if the group is gone.
 fn kill_pid(pid: u32) {
     if pid == 0 {
         return;
     }
     #[cfg(unix)]
     unsafe {
-        libc::kill(pid as i32, libc::SIGKILL);
+        if libc::kill(-(pid as i32), libc::SIGKILL) != 0 {
+            libc::kill(pid as i32, libc::SIGKILL);
+        }
     }
     #[cfg(windows)]
     {
@@ -734,6 +747,15 @@ impl CreateServer {
         }
         if self.mc_version.trim().is_empty() && self.server_type != "custom" {
             return Err("mc_version is required".into());
+        }
+        // Loader/mc versions end up in filenames and URLs — no traversal chars.
+        for v in [&self.mc_version, &self.loader_version] {
+            if !v
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | '+'))
+            {
+                return Err("invalid characters in version".into());
+            }
         }
         if !(1024..=65535).contains(&self.port) {
             return Err("port must be 1024-65535".into());
@@ -842,27 +864,31 @@ mod tests {
 
     #[test]
     fn log_line_handling() {
-        let rt = Runtime::new(ServerRecord {
-            id: "x".into(),
-            name: "x".into(),
-            server_type: "paper".into(),
-            mc_version: "1.21".into(),
-            loader_version: "".into(),
-            port: 25565,
-            memory_mb: 2048,
-            min_memory_mb: 0,
-            java_path: "java".into(),
-            jvm_args: "".into(),
-            dir: "/x".into(),
-            jar: "server.jar".into(),
-            auto_start: 0,
-            restart_on_crash: 0,
-            shutdown_timeout_sec: 30,
-            empty_stop_minutes: 0,
-            icon: "".into(),
-            created_at: "".into(),
-            updated_at: "".into(),
-        });
+        let (events, _) = tokio::sync::broadcast::channel(8);
+        let rt = Runtime::new(
+            ServerRecord {
+                id: "x".into(),
+                name: "x".into(),
+                server_type: "paper".into(),
+                mc_version: "1.21".into(),
+                loader_version: "".into(),
+                port: 25565,
+                memory_mb: 2048,
+                min_memory_mb: 0,
+                java_path: "java".into(),
+                jvm_args: "".into(),
+                dir: "/x".into(),
+                jar: "server.jar".into(),
+                auto_start: 0,
+                restart_on_crash: 0,
+                shutdown_timeout_sec: 30,
+                empty_stop_minutes: 0,
+                icon: "".into(),
+                created_at: "".into(),
+                updated_at: "".into(),
+            },
+            events,
+        );
         let rt = Arc::new(rt);
         tokio_test::block_on(async {
             rt.handle_log_line("[t] [a/INFO]: Steve joined the game")

@@ -47,27 +47,19 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _installJava() async {
-    final c = TextEditingController(text: '21');
-    final v = await showDialog<int>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-              title: const Text('Install Java (Temurin)'),
-              content: TextField(
-                  controller: c,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: 'Major version', hintText: '8, 17, 21')),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () =>
-                        Navigator.pop(ctx, int.tryParse(c.text.trim())),
-                    child: const Text('Download')),
-              ],
-            ));
-    if (v == null) return;
+    final text = await promptText(context,
+        title: 'Install Java (Temurin)',
+        label: 'Major version',
+        hint: '8, 17, 21',
+        initial: '21',
+        keyboardType: TextInputType.number,
+        confirmLabel: 'Download');
+    if (text == null) return;
+    final v = int.tryParse(text);
+    if (v == null) {
+      if (mounted) showError(context, 'Invalid version');
+      return;
+    }
     try {
       await api.installJava(v);
       await _load();
@@ -75,6 +67,15 @@ class _SettingsPageState extends State<SettingsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Java $v installed')));
       }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  Future<void> _deleteJava(JavaInstall j) async {
+    try {
+      await api.deleteJava(j.id);
+      await _load();
     } catch (e) {
       if (mounted) showError(context, e);
     }
@@ -90,37 +91,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _changePassword() async {
-    final cur = TextEditingController();
-    final next = TextEditingController();
-    final ok = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-              title: const Text('Change password'),
-              content: Column(mainAxisSize: MainAxisSize.min, children: [
-                TextField(
-                    controller: cur,
-                    obscureText: true,
-                    decoration:
-                        const InputDecoration(labelText: 'Current password')),
-                const SizedBox(height: 12),
-                TextField(
-                    controller: next,
-                    obscureText: true,
-                    decoration:
-                        const InputDecoration(labelText: 'New password')),
-              ]),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Change')),
-              ],
-            ));
-    if (ok != true) return;
+    final pair = await promptPasswordChange(context);
+    if (pair == null) return;
     try {
-      await api.changePassword(cur.text, next.text);
+      await api.changePassword(pair.$1, pair.$2);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Password changed — sign in again')));
@@ -164,10 +138,17 @@ class _SettingsPageState extends State<SettingsPage> {
                             style: const TextStyle(
                                 fontFamily: 'JetBrainsMono', fontSize: 11),
                             overflow: TextOverflow.ellipsis),
-                        trailing: j.version.isNotEmpty
-                            ? Text(j.version,
-                                style: Theme.of(context).textTheme.labelSmall)
-                            : null,
+                        trailing: j.managed
+                            ? IconButton(
+                                tooltip: 'Remove runtime',
+                                icon: const Icon(Icons.delete_outline,
+                                    size: 18),
+                                onPressed: () => _deleteJava(j))
+                            : j.version.isNotEmpty
+                                ? Text(j.version,
+                                    style:
+                                        Theme.of(context).textTheme.labelSmall)
+                                : null,
                       ),
                     Padding(
                       padding: const EdgeInsets.all(12),

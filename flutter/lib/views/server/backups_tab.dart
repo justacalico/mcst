@@ -30,31 +30,20 @@ class _BackupsTabState extends State<BackupsTab> {
   }
 
   Future<void> _load() async {
+    Object? err;
     try {
       _backups = await api.listBackups(widget.server.id);
-    } catch (_) {}
-    if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      err = e;
+    }
+    if (!mounted) return;
+    if (err != null) showError(context, err);
+    setState(() => _loading = false);
   }
 
   Future<void> _create() async {
-    final c = TextEditingController();
-    final note = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-              title: const Text('New backup'),
-              content: TextField(
-                  controller: c,
-                  decoration:
-                      const InputDecoration(labelText: 'Note (optional)')),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () => Navigator.pop(ctx, c.text.trim()),
-                    child: const Text('Back up')),
-              ],
-            ));
+    final note = await promptText(context,
+        title: 'New backup', label: 'Note (optional)', confirmLabel: 'Back up');
     if (note == null) return;
     setState(() => _creating = true);
     try {

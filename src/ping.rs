@@ -134,7 +134,11 @@ async fn read_packet(s: &mut TcpStream) -> Option<Vec<u8>> {
         return None;
     }
     let (slen, slen_used) = read_varint(&buf[used..])?;
-    Some(buf[used + slen_used..used + slen_used + slen as usize].to_vec())
+    let end = used + slen_used + slen as usize;
+    if end > buf.len() {
+        return None;
+    }
+    Some(buf[used + slen_used..end].to_vec())
 }
 
 #[cfg(test)]

@@ -74,13 +74,16 @@ pub async fn create(
 pub async fn update(
     State(s): State<Arc<AppState>>,
     _u: AuthUser,
-    Path((_id, sid)): Path<(String, String)>,
+    Path((id, sid)): Path<(String, String)>,
     Json(req): Json<ScheduleReq>,
 ) -> ApiResult<Json<serde_json::Value>> {
     let mut row =
         s.db.get_schedule(&sid)
             .await?
             .ok_or_else(|| ApiError::not_found("schedule not found"))?;
+    if row.server_id != id {
+        return Err(ApiError::not_found("schedule not found"));
+    }
     crate::schedules::validate(
         &req.action,
         &req.payload,
@@ -101,10 +104,11 @@ pub async fn update(
 pub async fn remove(
     State(s): State<Arc<AppState>>,
     _u: AuthUser,
-    Path((_id, sid)): Path<(String, String)>,
+    Path((id, sid)): Path<(String, String)>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    if s.db.get_schedule(&sid).await?.is_none() {
-        return Err(ApiError::not_found("schedule not found"));
+    match s.db.get_schedule(&sid).await? {
+        Some(r) if r.server_id == id => {}
+        _ => return Err(ApiError::not_found("schedule not found")),
     }
     s.db.delete_schedule(&sid).await?;
     Ok(Json(serde_json::json!({"ok": true})))

@@ -27,6 +27,7 @@ class _ConsoleTabState extends State<ConsoleTab> {
   int _historyIdx = -1;
   StreamSubscription<ConsoleEvent>? _sub;
   bool _autoscroll = true;
+  bool _connected = true;
 
   @override
   void initState() {
@@ -64,6 +65,7 @@ class _ConsoleTabState extends State<ConsoleTab> {
   }
 
   void _connect() {
+    _connected = true;
     _sub = context
         .read<AppState>()
         .api
@@ -81,7 +83,14 @@ class _ConsoleTabState extends State<ConsoleTab> {
         }
       });
       if (_autoscroll) _toBottom();
-    });
+    },
+      onError: (_) {
+        if (mounted) setState(() => _connected = false);
+      },
+      onDone: () {
+        if (mounted) setState(() => _connected = false);
+      },
+    );
   }
 
   void _toBottom() {
@@ -140,9 +149,34 @@ class _ConsoleTabState extends State<ConsoleTab> {
             IconButton(
                 tooltip: 'Copy logs',
                 icon: const Icon(Icons.copy, size: 18),
-                onPressed: () {}),
+                onPressed: () {
+                  Clipboard.setData(
+                      ClipboardData(text: _lines.join('\n')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Logs copied')));
+                }),
           ]),
         ),
+        if (!_connected)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: scheme.errorContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(children: [
+              Icon(Icons.cloud_off, size: 16, color: scheme.onErrorContainer),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text('Console disconnected',
+                      style: TextStyle(color: scheme.onErrorContainer))),
+              TextButton(
+                  onPressed: () => setState(_connect),
+                  child: const Text('Reconnect')),
+            ]),
+          ),
         const SizedBox(height: 8),
         Expanded(
           child: Container(

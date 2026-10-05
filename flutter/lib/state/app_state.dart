@@ -64,13 +64,15 @@ class AppState extends ChangeNotifier {
           Timer.periodic(const Duration(seconds: 3), (_) => refreshStats());
     }
     _events?.cancel();
+    void reconnect() {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (session == SessionState.ready) _afterAuth();
+      });
+    }
     _events = api.eventsStream().listen(_onEvent,
-        onError: (_) {
-          // Reconnect after a beat.
-          Future.delayed(const Duration(seconds: 3), () {
-            if (session == SessionState.ready) _afterAuth();
-          });
-        },
+        onError: (_) => reconnect(),
+        // A clean close (server restart, proxy timeout) also needs a retry.
+        onDone: reconnect,
         cancelOnError: false);
   }
 
@@ -91,6 +93,9 @@ class AppState extends ChangeNotifier {
         servers[i] = s.copyWith(
           playersOnline: (ev.data['online'] as num?)?.toInt(),
           playersMax: (ev.data['max'] as num?)?.toInt(),
+          playerNames: (ev.data['names'] as List?)
+              ?.map((e) => e.toString())
+              .toList(),
         );
     }
     notifyListeners();
@@ -101,6 +106,12 @@ class AppState extends ChangeNotifier {
       servers = await api.listServers();
       apiUnreachable = false;
       lastError = null;
+    } on ApiException catch (e) {
+      if (e.status == 401) {
+        unawaited(logout());
+        return;
+      }
+      lastError = e;
     } catch (e) {
       lastError = e;
     }
@@ -110,6 +121,11 @@ class AppState extends ChangeNotifier {
   Future<void> refreshStats() async {
     try {
       stats = await api.systemStats();
+    } on ApiException catch (e) {
+      if (e.status == 401) {
+        unawaited(logout());
+        return;
+      }
     } catch (_) {}
     notifyListeners();
   }

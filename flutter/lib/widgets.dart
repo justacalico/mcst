@@ -291,3 +291,145 @@ void showError(BuildContext context, Object e) {
     SnackBar(content: Text('$e')),
   );
 }
+
+/// Single-line text prompt. The controller lives inside the dialog's own
+/// State, so it is disposed with the route — not between `pop()` and the end
+/// of the pop animation, where a caller-side `dispose()` would still find the
+/// TextField mounted.
+Future<String?> promptText(
+  BuildContext context, {
+  required String title,
+  String label = '',
+  String hint = '',
+  String initial = '',
+  TextInputType? keyboardType,
+  String confirmLabel = 'Save',
+  bool danger = false,
+  String? body,
+}) =>
+    showDialog<String>(
+      context: context,
+      builder: (_) => _TextPrompt(
+          title: title,
+          label: label,
+          hint: hint,
+          initial: initial,
+          keyboardType: keyboardType,
+          confirmLabel: confirmLabel,
+          danger: danger,
+          body: body),
+    );
+
+class _TextPrompt extends StatefulWidget {
+  final String title, label, hint, initial, confirmLabel;
+  final TextInputType? keyboardType;
+  final bool danger;
+  final String? body;
+  const _TextPrompt(
+      {required this.title,
+      this.label = '',
+      this.hint = '',
+      this.initial = '',
+      this.keyboardType,
+      this.confirmLabel = 'Save',
+      this.danger = false,
+      this.body});
+
+  @override
+  State<_TextPrompt> createState() => _TextPromptState();
+}
+
+class _TextPromptState extends State<_TextPrompt> {
+  late final TextEditingController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text(widget.title),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (widget.body != null) ...[
+            Text(widget.body!),
+            const SizedBox(height: 12),
+          ],
+          TextField(
+              controller: _c,
+              autofocus: true,
+              keyboardType: widget.keyboardType,
+              decoration: InputDecoration(
+                  labelText: widget.label.isEmpty ? null : widget.label,
+                  hintText: widget.hint.isEmpty ? null : widget.hint)),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              style: widget.danger
+                  ? FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error)
+                  : null,
+              onPressed: () => Navigator.pop(context, _c.text.trim()),
+              child: Text(widget.confirmLabel)),
+        ],
+      );
+}
+
+/// Two-field password change prompt (current + new).
+Future<(String, String)?> promptPasswordChange(BuildContext context) =>
+    showDialog<(String, String)>(
+        context: context, builder: (_) => const _PasswordPrompt());
+
+class _PasswordPrompt extends StatefulWidget {
+  const _PasswordPrompt();
+
+  @override
+  State<_PasswordPrompt> createState() => _PasswordPromptState();
+}
+
+class _PasswordPromptState extends State<_PasswordPrompt> {
+  final _cur = TextEditingController();
+  final _next = TextEditingController();
+
+  @override
+  void dispose() {
+    _cur.dispose();
+    _next.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Change password'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+              controller: _cur,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Current password')),
+          const SizedBox(height: 12),
+          TextField(
+              controller: _next,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New password')),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, (_cur.text, _next.text)),
+              child: const Text('Change')),
+        ],
+      );
+}

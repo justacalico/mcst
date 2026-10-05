@@ -40,6 +40,14 @@ class _ServerDetailPageState extends State<ServerDetailPage>
     } catch (_) {}
   }
 
+  Future<void> _lifecycle(BuildContext context, String id, String action) async {
+    try {
+      await context.read<AppState>().lifecycle(id, action);
+    } catch (e) {
+      if (context.mounted) showError(context, e);
+    }
+  }
+
   @override
   void dispose() {
     _tabs.dispose();
@@ -74,17 +82,17 @@ class _ServerDetailPageState extends State<ServerDetailPage>
             IconButton(
                 tooltip: 'Start',
                 icon: const Icon(Icons.play_arrow),
-                onPressed: () => app.lifecycle(server.id, 'start')),
+                onPressed: () => _lifecycle(context, server.id, 'start')),
           if (running)
             IconButton(
                 tooltip: 'Restart',
                 icon: const Icon(Icons.restart_alt),
-                onPressed: () => app.lifecycle(server.id, 'restart')),
+                onPressed: () => _lifecycle(context, server.id, 'restart')),
           if (active)
             IconButton(
                 tooltip: 'Stop',
                 icon: const Icon(Icons.stop),
-                onPressed: () => app.lifecycle(server.id, 'stop')),
+                onPressed: () => _lifecycle(context, server.id, 'stop')),
           if (active)
             IconButton(
                 tooltip: 'Kill',
@@ -125,7 +133,6 @@ class _ServerDetailPageState extends State<ServerDetailPage>
   }
 
   Future<void> _confirmKill(BuildContext context, ServerDto s) async {
-    final app = context.read<AppState>();
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -142,6 +149,8 @@ class _ServerDetailPageState extends State<ServerDetailPage>
         ],
       ),
     );
-    if (ok == true) await app.lifecycle(s.id, 'kill');
+    if (ok == true && context.mounted) {
+      await _lifecycle(context, s.id, 'kill');
+    }
   }
 }

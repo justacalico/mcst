@@ -80,7 +80,8 @@ pub async fn upload(
 ) -> ApiResult<Json<serde_json::Value>> {
     let root = root(&s, &id).await?;
     let mut dir = String::new();
-    let mut saved = Vec::new();
+    // Buffer files first — the `path` field may arrive after `file`.
+    let mut pending: Vec<(String, axum::body::Bytes)> = Vec::new();
     while let Ok(Some(field)) = multipart.next_field().await {
         match field.name() {
             Some("path") => dir = field.text().await.unwrap_or_default(),
@@ -93,16 +94,20 @@ pub async fn upload(
                     .bytes()
                     .await
                     .map_err(|e| ApiError::bad_request(e.to_string()))?;
-                let rel = if dir.is_empty() {
-                    name.clone()
-                } else {
-                    format!("{}/{}", dir.trim_end_matches('/'), name)
-                };
-                fops::write_bytes(&root, &rel, &bytes).await?;
-                saved.push(rel);
+                pending.push((name, bytes));
             }
             _ => {}
         }
+    }
+    let mut saved = Vec::new();
+    for (name, bytes) in pending {
+        let rel = if dir.is_empty() {
+            name
+        } else {
+            format!("{}/{}", dir.trim_end_matches('/'), name)
+        };
+        fops::write_bytes(&root, &rel, &bytes).await?;
+        saved.push(rel);
     }
     if saved.is_empty() {
         return Err(ApiError::bad_request("no file uploaded"));

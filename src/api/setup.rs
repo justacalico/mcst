@@ -37,13 +37,16 @@ pub async fn setup(
     State(s): State<Arc<AppState>>,
     Json(req): Json<SetupRequest>,
 ) -> ApiResult<impl axum::response::IntoResponse> {
-    if s.db.user_count().await? > 0 {
-        return Err(ApiError::conflict("setup already completed"));
+    if s.config.dev_mode {
+        return Err(ApiError::conflict("dev mode has no accounts"));
     }
     password::validate_username(&req.username).map_err(ApiError::bad_request)?;
     password::validate(&req.password).map_err(ApiError::bad_request)?;
     let hash = password::hash(&req.password).map_err(|e| ApiError::internal(e.to_string()))?;
-    let uid = s.db.create_user(&req.username, &hash).await?;
+    let uid =
+        s.db.create_first_user(&req.username, &hash)
+            .await?
+            .ok_or_else(|| ApiError::conflict("setup already completed"))?;
     let token = crate::auth::create_session(&s.db, &uid).await?;
     s.db.audit(&req.username, "setup", "owner account created")
         .await

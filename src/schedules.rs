@@ -112,6 +112,14 @@ pub async fn execute(mgr: &ServerManager, db: &Db, s: &ScheduleRow) -> Result<()
                 &s.payload,
             )
             .await?;
+            let keep = db
+                .get_setting("backup_keep")
+                .await
+                .ok()
+                .flatten()
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(10);
+            crate::backups::prune(db, &s.server_id, keep).await.ok();
         }
         _ => {}
     }

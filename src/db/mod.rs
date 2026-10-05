@@ -53,15 +53,23 @@ impl Db {
         Ok(row.get::<i64, _>("c"))
     }
 
-    pub async fn create_user(&self, username: &str, password_hash: &str) -> Result<String> {
+    /// Atomically insert the first user; returns None if any user exists.
+    pub async fn create_first_user(
+        &self,
+        username: &str,
+        password_hash: &str,
+    ) -> Result<Option<String>> {
         let id = Uuid::new_v4().to_string();
-        sqlx::query("INSERT INTO users (id, username, password_hash) VALUES (?, ?, ?)")
-            .bind(&id)
-            .bind(username)
-            .bind(password_hash)
-            .execute(&self.pool)
-            .await?;
-        Ok(id)
+        let n = sqlx::query(
+            "INSERT INTO users (id, username, password_hash)
+             SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM users)",
+        )
+        .bind(&id)
+        .bind(username)
+        .bind(password_hash)
+        .execute(&self.pool)
+        .await?;
+        Ok((n.rows_affected() > 0).then_some(id))
     }
 
     pub async fn user_by_name(&self, username: &str) -> Result<Option<UserRow>> {
@@ -95,12 +103,19 @@ impl Db {
 
     // ---------- sessions ----------
 
+    /// Sessions store a SHA-256 of the token — a database read alone can't
+    /// be replayed as a live session.
+    fn hash_token(token: &str) -> String {
+        use sha2::Digest;
+        hex::encode(sha2::Sha256::digest(token.as_bytes()))
+    }
+
     pub async fn create_session(&self, user_id: &str, token: &str, days: i64) -> Result<()> {
         sqlx::query(
             "INSERT INTO sessions (token, user_id, expires_at) \
              VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now', '+' || ? || ' days'))",
         )
-        .bind(token)
+        .bind(Self::hash_token(token))
         .bind(user_id)
         .bind(days)
         .execute(&self.pool)
@@ -114,7 +129,7 @@ impl Db {
              JOIN users u ON u.id = s.user_id \
              WHERE s.token = ? AND s.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ','now')",
         )
-        .bind(token)
+        .bind(Self::hash_token(token))
         .fetch_optional(&self.pool)
         .await?;
         Ok(row)
@@ -122,7 +137,7 @@ impl Db {
 
     pub async fn delete_session(&self, token: &str) -> Result<()> {
         sqlx::query("DELETE FROM sessions WHERE token = ?")
-            .bind(token)
+            .bind(Self::hash_token(token))
             .execute(&self.pool)
             .await?;
         Ok(())
@@ -484,4 +499,38 @@ pub struct AuditRow {
     pub actor: String,
     pub action: String,
     pub detail: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn first_user_insert_is_atomic() {
+        let db = Db::connect("sqlite::memory:").await.unwrap();
+        let a = db.create_first_user("alice", "h1").await.unwrap();
+        assert!(a.is_some());
+        // Racing second setup request is refused by the atomic insert.
+        let b = db.create_first_user("mallory", "h2").await.unwrap();
+        assert!(b.is_none());
+        assert_eq!(db.user_count().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn sessions_are_hashed_at_rest() {
+        let db = Db::connect("sqlite::memory:").await.unwrap();
+        let uid = db.create_first_user("alice", "h1").await.unwrap().unwrap();
+        db.create_session(&uid, "raw-token", 30).await.unwrap();
+        // The stored token is not the bearer token.
+        let stored: String = sqlx::query_scalar("SELECT token FROM sessions LIMIT 1")
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+        assert_ne!(stored, "raw-token");
+        // But lookups by the raw token still resolve.
+        let u = db.session_user("raw-token").await.unwrap().unwrap();
+        assert_eq!(u.username, "alice");
+        db.delete_session("raw-token").await.unwrap();
+        assert!(db.session_user("raw-token").await.unwrap().is_none());
+    }
 }

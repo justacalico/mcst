@@ -58,8 +58,9 @@ class _Gate extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     return switch (app.session) {
-      SessionState.unknown => const Scaffold(
-          body: Center(child: CircularProgressIndicator())),
+      SessionState.unknown => app.apiUnreachable
+          ? UnreachablePage(onRetry: app.init)
+          : const Scaffold(body: Center(child: CircularProgressIndicator())),
       SessionState.needsSetup => const SetupPage(),
       SessionState.loggedOut => const LoginPage(),
       SessionState.ready =>

@@ -50,6 +50,14 @@ pub async fn create(
         &note,
     )
     .await?;
+    let keep =
+        s.db.get_setting("backup_keep")
+            .await
+            .ok()
+            .flatten()
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(10);
+    crate::backups::prune(&s.db, &id, keep).await.ok();
     s.db.audit(&user.username, "backup_create", &id).await.ok();
     Ok(Json(serde_json::json!({"backup": row})))
 }

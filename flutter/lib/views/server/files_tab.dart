@@ -44,12 +44,14 @@ class _FilesTabState extends State<FilesTab> {
     });
     try {
       final e = await api.listFiles(_sid, path);
+      if (!mounted) return;
       setState(() {
         _path = path;
         _entries = e;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = '$e';
         _loading = false;
@@ -61,6 +63,7 @@ class _FilesTabState extends State<FilesTab> {
     if (f.isDir) return _load(f.path);
     try {
       final content = await api.readFile(_sid, f.path);
+      if (!mounted) return;
       setState(() {
         _editing = f.path;
         _editor.text = content;
@@ -75,6 +78,7 @@ class _FilesTabState extends State<FilesTab> {
     if (_editing == null) return;
     try {
       await api.writeFile(_sid, _editing!, _editor.text);
+      if (!mounted) return;
       setState(() => _dirty = false);
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -88,9 +92,13 @@ class _FilesTabState extends State<FilesTab> {
   Future<void> _upload() async {
     final res = await FilePicker.platform.pickFiles(withData: true);
     if (res == null) return;
-    for (final f in res.files) {
-      if (f.bytes == null) continue;
-      await api.uploadFile(_sid, _path, f.name, f.bytes!);
+    try {
+      for (final f in res.files) {
+        if (f.bytes == null) continue;
+        await api.uploadFile(_sid, _path, f.name, f.bytes!);
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
     }
     await _load(_path);
   }
@@ -110,31 +118,24 @@ class _FilesTabState extends State<FilesTab> {
               ],
             ));
     if (ok == true) {
-      await api.deleteFile(_sid, f.path);
+      try {
+        await api.deleteFile(_sid, f.path);
+      } catch (e) {
+        if (mounted) showError(context, e);
+      }
       await _load(_path);
     }
   }
 
   Future<void> _newFolder() async {
-    final c = TextEditingController();
-    final name = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-              title: const Text('New folder'),
-              content: TextField(
-                  controller: c, autofocus: true, decoration: const InputDecoration(labelText: 'Name')),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel')),
-                FilledButton(
-                    onPressed: () => Navigator.pop(ctx, c.text.trim()),
-                    child: const Text('Create')),
-              ],
-            ));
+    final name = await promptText(context,
+        title: 'New folder', label: 'Name', confirmLabel: 'Create');
     if (name != null && name.isNotEmpty) {
-      await api.mkdir(
-          _sid, _path.isEmpty ? name : '$_path/$name');
+      try {
+        await api.mkdir(_sid, _path.isEmpty ? name : '$_path/$name');
+      } catch (e) {
+        if (mounted) showError(context, e);
+      }
       await _load(_path);
     }
   }

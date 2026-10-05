@@ -110,36 +110,23 @@ class _ServerSettingsTabState extends State<ServerSettingsTab> {
   }
 
   Future<void> _delete() async {
-    final c = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Delete ${widget.server.name}?'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text(
-              'Worlds, configs, and backups are permanently deleted. Type the server name to confirm.'),
-          const SizedBox(height: 12),
-          TextField(controller: c, decoration: const InputDecoration(labelText: 'Server name')),
-        ]),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          FilledButton(
-              style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(ctx).colorScheme.error),
-              onPressed: () => Navigator.pop(
-                  ctx, c.text.trim() == widget.server.name),
-              child: const Text('Delete')),
-        ],
-      ),
-    );
-    if (ok == true && mounted) {
+    final typed = await promptText(context,
+        title: 'Delete ${widget.server.name}?',
+        label: 'Server name',
+        confirmLabel: 'Delete',
+        danger: true,
+        body:
+            'Worlds, configs, and backups are permanently deleted. Type the server name to confirm.');
+    if (typed == widget.server.name && mounted) {
       final nav = Navigator.of(context);
       final app = context.read<AppState>();
-      await api.deleteServer(widget.server.id);
-      await app.refreshServers();
-      nav.pop();
+      try {
+        await api.deleteServer(widget.server.id);
+        await app.refreshServers();
+        nav.pop();
+      } catch (e) {
+        if (mounted) showError(context, e);
+      }
     }
   }
 
@@ -147,41 +134,16 @@ class _ServerSettingsTabState extends State<ServerSettingsTab> {
     try {
       final raw = await api.getPropertiesRaw(widget.server.id);
       if (!mounted) return;
-      final c = TextEditingController(text: raw);
-      final save = await showDialog<bool>(
+      final text = await showDialog<String>(
           context: context,
-          builder: (ctx) => AlertDialog(
-                title: const Text('server.properties'),
-                content: SizedBox(
-                  width: 560,
-                  height: 420,
-                  child: TextField(
-                    controller: c,
-                    maxLines: null,
-                    expands: true,
-                    textAlignVertical: TextAlignVertical.top,
-                    style: const TextStyle(
-                        fontFamily: 'JetBrainsMono', fontSize: 12),
-                    decoration: const InputDecoration(border: InputBorder.none),
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel')),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Save')),
-                ],
-              ));
-      if (save == true) {
-        await api.putPropertiesRaw(widget.server.id, c.text);
+          builder: (_) => _PropertiesDialog(initial: raw));
+      if (text != null) {
+        await api.putPropertiesRaw(widget.server.id, text);
         if (mounted) {
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text('Properties saved')));
         }
       }
-      c.dispose();
     } catch (e) {
       if (mounted) showError(context, e);
     }
@@ -360,4 +322,55 @@ class _ServerSettingsTabState extends State<ServerSettingsTab> {
       ],
     );
   }
+}
+
+/// Raw server.properties editor — owns its controller for the dialog's whole
+/// lifecycle.
+class _PropertiesDialog extends StatefulWidget {
+  final String initial;
+  const _PropertiesDialog({required this.initial});
+
+  @override
+  State<_PropertiesDialog> createState() => _PropertiesDialogState();
+}
+
+class _PropertiesDialogState extends State<_PropertiesDialog> {
+  late final TextEditingController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = TextEditingController(text: widget.initial);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('server.properties'),
+        content: SizedBox(
+          width: 560,
+          height: 420,
+          child: TextField(
+            controller: _c,
+            maxLines: null,
+            expands: true,
+            textAlignVertical: TextAlignVertical.top,
+            style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: 12),
+            decoration: const InputDecoration(border: InputBorder.none),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, _c.text),
+              child: const Text('Save')),
+        ],
+      );
 }

@@ -48,7 +48,11 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/servers/{id}/restart", post(servers::restart))
         .route("/servers/{id}/kill", post(servers::kill))
         .route("/servers/{id}/update", post(servers::update_jar))
-        .route("/servers/{id}/icon", post(servers::set_icon))
+        .route(
+            "/servers/{id}/icon",
+            post(servers::set_icon)
+                .route_layer(axum::extract::DefaultBodyLimit::max(3 * 1024 * 1024)),
+        )
         .route("/servers/{id}/console", get(console::console_ws))
         .route("/servers/{id}/command", post(servers::command))
         .route(

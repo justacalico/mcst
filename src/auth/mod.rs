@@ -22,9 +22,11 @@ pub struct AuthUser {
     pub username: String,
 }
 
-/// Mint a session token and store it.
+/// Mint a session token and store it (hashed at rest in `db`).
 pub async fn create_session(db: &Db, user_id: &str) -> anyhow::Result<String> {
     let token = random_token(32);
+    // Opportunistic sweep so expired rows don't accumulate forever.
+    db.delete_expired_sessions().await.ok();
     db.create_session(user_id, &token, SESSION_DAYS).await?;
     Ok(token)
 }

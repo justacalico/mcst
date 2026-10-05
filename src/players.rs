@@ -168,6 +168,9 @@ pub async fn remove(
     kind: ListKind,
     name: &str,
 ) -> Result<Vec<PlayerEntry>, ApiError> {
+    if !valid_name(name) {
+        return Err(ApiError::bad_request("invalid player name"));
+    }
     let mut entries = read_list(server_dir, kind)
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
@@ -189,15 +192,15 @@ async fn write_list(
     Ok(())
 }
 
-/// A plausible offline-mode UUID (deterministic per name).
+/// Offline-mode UUID exactly as the server computes it:
+/// `UUID.nameUUIDFromBytes("OfflinePlayer:" + name)` — MD5, version 3,
+/// RFC 4122 variant. Case-sensitive like Java.
 pub fn offline_uuid(name: &str) -> String {
-    use sha2::Digest;
-    let h = sha2::Sha256::digest(format!("OfflinePlayer:{}", name.to_lowercase()).as_bytes());
-    let mut hexs = hex::encode(&h[..16]);
-    // Set version 3 (name-based MD5-style) bits.
-    hexs.replace_range(12..13, "3");
-    hexs.replace_range(16..17, "8");
-    dash_uuid(&hexs[..32])
+    use md5::Digest;
+    let mut h = md5::Md5::digest(format!("OfflinePlayer:{name}").as_bytes()).to_vec();
+    h[6] = (h[6] & 0x0f) | 0x30;
+    h[8] = (h[8] & 0x3f) | 0x80;
+    dash_uuid(&hex::encode(h))
 }
 
 /// Minecraft name rules: 3-16 chars, alphanumeric + underscore.
@@ -233,7 +236,16 @@ mod tests {
         assert_eq!(undash_uuid("a-b"), "ab");
         let off = offline_uuid("Steve");
         assert_eq!(off.len(), 36);
-        assert_eq!(offline_uuid("Steve"), offline_uuid("steve")); // case-insensitive
+        assert_eq!(off, offline_uuid("Steve")); // deterministic
+                                                // Matches Java's UUID.nameUUIDFromBytes semantics — version 3.
+        assert_eq!(&off[14..15], "3");
+        // Case-sensitive, exactly like the server's own derivation.
+        assert_ne!(offline_uuid("Steve"), offline_uuid("steve"));
+        // Reference vector: md5("OfflinePlayer:Notch") with v3 bits.
+        assert_eq!(
+            offline_uuid("Notch"),
+            "b50ad385-829d-3141-a216-7e7d7539ba7f"
+        );
     }
 
     #[test]
@@ -264,4 +276,26 @@ mod tests {
         assert_eq!(back[0].name, "Steve");
         assert!(list(d.path(), ListKind::Bans).await.unwrap().is_empty());
     }
+}
+
+#[tokio::test]
+async fn remove_rejects_unsafe_names() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = crate::db::Db::connect("sqlite::memory:").await.unwrap();
+    let cfg = crate::config::Config {
+        host: "127.0.0.1".into(),
+        port: 0,
+        data_dir: dir.path().to_path_buf(),
+        dev_mode: true,
+        local_only: true,
+        tailscale_bin: "tailscale".into(),
+    };
+    let mgr = crate::servers::ServerManager::new(db, cfg);
+    // A %0A-decoded name must not become a second console command.
+    assert!(remove(&mgr, dir.path(), "sid", ListKind::Ops, "ok\nop bad")
+        .await
+        .is_err());
+    assert!(remove(&mgr, dir.path(), "sid", ListKind::Ops, "Steve")
+        .await
+        .is_ok());
 }

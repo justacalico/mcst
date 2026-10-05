@@ -22,6 +22,7 @@ class _ModsTabState extends State<ModsTab> {
   List<ModrinthHit> _hits = const [];
   List<InstalledFile> _installed = const [];
   bool _searching = false;
+  int _searchSeq = 0;
   String? _error;
   Timer? _debounce;
 
@@ -40,7 +41,9 @@ class _ModsTabState extends State<ModsTab> {
     try {
       _installed = await api.listMods(widget.server.id);
       if (mounted) setState(() {});
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
   }
 
   void _onQuery(String q) {
@@ -49,16 +52,18 @@ class _ModsTabState extends State<ModsTab> {
   }
 
   Future<void> _doSearch(String q) async {
+    final seq = ++_searchSeq;
     setState(() {
       _searching = true;
       _error = null;
     });
     try {
-      _hits = await api.searchMods(widget.server.id, q);
+      final hits = await api.searchMods(widget.server.id, q);
+      if (seq == _searchSeq) _hits = hits;
     } catch (e) {
-      _error = '$e';
+      if (seq == _searchSeq) _error = '$e';
     }
-    if (mounted) setState(() => _searching = false);
+    if (mounted && seq == _searchSeq) setState(() => _searching = false);
   }
 
   Future<void> _install(ModrinthHit h) async {

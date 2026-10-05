@@ -35,10 +35,13 @@ pub async fn login(
     State(s): State<Arc<AppState>>,
     Json(req): Json<LoginRequest>,
 ) -> ApiResult<impl axum::response::IntoResponse> {
-    let user =
-        s.db.user_by_name(&req.username)
-            .await?
-            .ok_or_else(|| ApiError::unauthorized("invalid username or password"))?;
+    let user = s.db.user_by_name(&req.username).await?;
+    // Spend equivalent hashing time on a miss so the response timing doesn't
+    // reveal whether the username exists.
+    let Some(user) = user else {
+        let _ = password::hash(&req.password);
+        return Err(ApiError::unauthorized("invalid username or password"));
+    };
     if !password::verify(&req.password, &user.password_hash) {
         return Err(ApiError::unauthorized("invalid username or password"));
     }

@@ -9,6 +9,9 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct JavaInstall {
+    /// Registry row id — set for managed installs so the UI can delete them.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
     pub path: String,
     pub major: u32,
     pub version: String,
@@ -46,6 +49,7 @@ async fn probe(bin: &Path) -> Option<JavaInstall> {
     );
     let (major, version) = parse_java_version(&text)?;
     Some(JavaInstall {
+        id: String::new(),
         path: bin.to_string_lossy().into_owned(),
         major,
         version,
@@ -260,6 +264,7 @@ mod tests {
     #[test]
     fn pick_best_runtime() {
         let j = |major: u32| JavaInstall {
+            id: String::new(),
             path: format!("/j/{major}"),
             major,
             version: major.to_string(),

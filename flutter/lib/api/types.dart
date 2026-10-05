@@ -142,6 +142,7 @@ class ServerDto {
     ServerStatus? status,
     int? playersOnline,
     int? playersMax,
+    List<String>? playerNames,
     double? cpuPercent,
     int? memBytes,
     int? uptimeSec,
@@ -169,7 +170,7 @@ class ServerDto {
         status: status ?? this.status,
         playersOnline: playersOnline ?? this.playersOnline,
         playersMax: playersMax ?? this.playersMax,
-        playerNames: playerNames,
+        playerNames: playerNames ?? this.playerNames,
         cpuPercent: cpuPercent ?? this.cpuPercent,
         memBytes: memBytes ?? this.memBytes,
         uptimeSec: uptimeSec ?? this.uptimeSec,
@@ -406,12 +407,14 @@ class ModrinthHit {
 }
 
 class JavaInstall {
+  final String id;
   final String path;
   final int major;
   final String version;
   final bool managed;
 
   const JavaInstall({
+    this.id = '',
     required this.path,
     required this.major,
     required this.version,
@@ -419,6 +422,7 @@ class JavaInstall {
   });
 
   factory JavaInstall.fromJson(Map<String, dynamic> j) => JavaInstall(
+        id: j['id'] as String? ?? '',
         path: j['path'] as String? ?? '',
         major: (j['major'] as num?)?.toInt() ?? 0,
         version: j['version'] as String? ?? '',

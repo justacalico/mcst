@@ -56,8 +56,23 @@ pub async fn collect(data_dir: &std::path::Path) -> SystemStats {
         kernel: System::kernel_version().unwrap_or_default(),
         arch: std::env::consts::ARCH.to_string(),
         load_avg: [load.one, load.five, load.fifteen],
-        data_dir_bytes: crate::files::dir_size(data_dir).await,
+        data_dir_bytes: cached_dir_size(data_dir).await,
     }
+}
+
+/// `dir_size` walks every server world — cache it so the 2s stats poll
+/// doesn't rescan the whole data directory each tick.
+async fn cached_dir_size(data_dir: &std::path::Path) -> u64 {
+    use std::sync::Mutex;
+    static CACHE: Mutex<Option<(std::time::Instant, u64)>> = Mutex::new(None);
+    if let Some((at, v)) = *CACHE.lock().unwrap() {
+        if at.elapsed() < std::time::Duration::from_secs(60) {
+            return v;
+        }
+    }
+    let v = crate::files::dir_size(data_dir).await;
+    *CACHE.lock().unwrap() = Some((std::time::Instant::now(), v));
+    v
 }
 
 /// Total/used bytes of the filesystem containing `path`; (0,0) on failure.
