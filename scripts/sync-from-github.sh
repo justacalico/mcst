@@ -52,7 +52,8 @@ ls -la release-assets/
 # package-registry upload does not collide with existing assets and the release
 # is recreated at the current commit.
 glab release delete "$RELEASE_TAG" -R "$CI_PROJECT_PATH" -y 2>/dev/null || true
-PKG_ID=$(glab api "projects/$CI_PROJECT_ID/packages?package_name=release-assets&package_version=$RELEASE_TAG" 2>/dev/null | jq -r 'if type=="array" then (.[0].id // empty) else empty end')
+echo "step: stale release cleanup done"
+PKG_ID=$(glab api "projects/$CI_PROJECT_ID/packages?package_name=release-assets&package_version=$RELEASE_TAG" 2>/dev/null | jq -r 'if type=="array" then (.[0].id // empty) else empty end' || true)
 if [ -n "$PKG_ID" ] && [ "$PKG_ID" != "null" ]; then
   glab api --method DELETE "projects/$CI_PROJECT_ID/packages/$PKG_ID" 2>/dev/null || true
 fi
@@ -61,6 +62,7 @@ fi
 # The CI job token cannot modify tags, but a deploy key with write access can.
 if [ -n "${GITLAB_RELEASE_SSH_KEY:-}" ]; then
   git remote add gitlab-ssh "git@gitlab.com:${CI_PROJECT_PATH}.git" 2>/dev/null || true
+  echo "step: moving tag to $RELEASE_COMMIT"
   git tag -f "$RELEASE_TAG" "$RELEASE_COMMIT"
   # Best effort — protected tags may reject deploy-key pushes; the tag is
   # already correct when it was pushed during the release flow.
@@ -69,6 +71,7 @@ if [ -n "${GITLAB_RELEASE_SSH_KEY:-}" ]; then
   fi
 fi
 
+echo "step: creating GitLab release"
 # Mirror to a GitLab release. The tag is kept the same as GitHub.
 # glab in CI will use CI_JOB_TOKEN when GLAB_ENABLE_CI_AUTOLOGIN is set.
 glab release create "$RELEASE_TAG" \
