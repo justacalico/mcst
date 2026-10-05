@@ -41,7 +41,8 @@ RUN apt-get update \
         ca-certificates \
         openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --create-home --shell /usr/sbin/nologin mcst
+    && useradd --system --create-home --shell /usr/sbin/nologin mcst \
+    && mkdir -p /home/mcst/data && chown mcst:mcst /home/mcst/data
 COPY --from=backend /app/target/release/mcst /usr/local/bin/mcst
 USER mcst
 WORKDIR /home/mcst
