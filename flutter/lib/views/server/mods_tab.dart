@@ -158,23 +158,13 @@ class _ModsTabState extends State<ModsTab> {
                                 : const Icon(Icons.extension),
                             title: Text(h.title),
                             subtitle: Text(
-                              h.description,
+                              '${h.description} — ${h.downloads} ↓',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text('${h.downloads} ↓',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall),
-                                TextButton(
-                                    onPressed: () => _install(h),
-                                    child: const Text('Install')),
-                              ],
-                            ),
+                            trailing: TextButton(
+                                onPressed: () => _install(h),
+                                child: const Text('Install')),
                           ),
                         );
                       },

@@ -1,0 +1,19 @@
+# Minimal deployment — no env files needed.
+#   docker compose up -d
+# Panel: http://localhost:25580  (first run asks you to create an account)
+services:
+  mcst:
+    build: .
+    image: mcst:latest
+    ports:
+      # Web panel. HTTP only; put a reverse proxy in front for public use.
+      - "127.0.0.1:25580:25580"
+      # Publish your servers' game ports here, e.g.:
+      # - "25565:25565"
+      # - "25565:25565/udp"
+    volumes:
+      - mcst-data:/home/mcst/data
+    restart: unless-stopped
+
+volumes:
+  mcst-data:
