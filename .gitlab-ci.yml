@@ -171,3 +171,15 @@ docker-image:
     - docker build --pull --tag "$IMAGE:$CI_COMMIT_TAG" --tag "$IMAGE:latest" .
     - docker push "$IMAGE:$CI_COMMIT_TAG"
     - docker push "$IMAGE:latest"
+
+# Publish the static landing page to GitLab Pages on main pushes.
+pages:
+  stage: release
+  tags: [linux-truenas]
+  image: alpine:3.21
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+  script:
+    - mkdir -p public && cp -r landing/* public/
+  artifacts:
+    paths: [public]
