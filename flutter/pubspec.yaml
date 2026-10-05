@@ -1,7 +1,7 @@
 name: mcst_frontend
 description: "mcst — self-hosted Minecraft server panel."
 publish_to: "none"
-version: 0.2.1+4
+version: 0.2.2+5
 
 environment:
   sdk: ^3.9.0

@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.2.2 - 2026-10-05
+#### Bug Fixes
+- 创建向导版本下拉框不再居中漂浮 - (29f62c1) - HttpAnimations
+
+- - -
+
 ## v0.2.1 - 2026-10-05
 #### Bug Fixes
 - 竖屏下卡片不再随宽度无限拉伸 - (614a455) - HttpAnimations
