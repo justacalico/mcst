@@ -1,0 +1,39 @@
+# Rust
+target/
+*.rs.bk
+
+# Data
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Flutter
+flutter/.dart_tool/
+flutter/.flutter-plugins
+flutter/.flutter-plugins-dependencies
+flutter/.packages
+flutter/build/
+flutter/.metadata
+frontend/dist/
+flutter/coverage/
+coverage/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit
+*.jks
+key.properties
+.env
+.env.*
+
+# Test artifacts
+test/goldens/*.png.tmp

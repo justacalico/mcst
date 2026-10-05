@@ -1,0 +1,37 @@
+tag_prefix = "v"
+from_latest_tag = true
+ignore_merge_commits = true
+branch_whitelist = ["main"]
+skip_ci = "[skip ci]"
+skip_untracked = false
+
+pre_bump_hooks = [
+  "./scripts/bump-version.sh {{version}}",
+]
+
+post_bump_hooks = []
+
+# CI auto-release profile: only bump the version files. The tag pipeline
+# syncs the tag to GitHub where the release build runs.
+[bump_profiles.ci]
+pre_bump_hooks = [
+  "./scripts/bump-version.sh {{version}}",
+]
+post_bump_hooks = []
+
+[commit_types]
+feat = { changelog_title = "Features", bump_minor = true }
+fix = { changelog_title = "Bug Fixes", bump_patch = true }
+perf = { changelog_title = "Performance", bump_patch = true }
+revert = { changelog_title = "Reverts", bump_patch = true }
+build = { changelog_title = "Build", omit_from_changelog = true }
+chore = { changelog_title = "Chores", omit_from_changelog = true }
+ci = { changelog_title = "CI/CD", omit_from_changelog = true }
+docs = { changelog_title = "Documentation", omit_from_changelog = true }
+refactor = { changelog_title = "Refactors", omit_from_changelog = true }
+style = { changelog_title = "Style", omit_from_changelog = true }
+test = { changelog_title = "Tests", omit_from_changelog = true }
+misc = { changelog_title = "Other", omit_from_changelog = true }
+
+[changelog]
+path = "CHANGELOG.md"
