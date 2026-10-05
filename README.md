@@ -116,7 +116,8 @@ cargo run -- --dev --local
 ```
 
 Source of truth is [GitLab](https://gitlab.com/HttpAnimations/mcst); GitHub
-hosts the mirror and release builds. Landing page lives in `landing/`.
+hosts the mirror and release builds. Landing page:
+<https://mcst-a6dd0f.gitlab.io/> (source in `landing/`).
 
 ## License
 
