@@ -16,17 +16,19 @@ pub struct PingInfo {
     pub version_name: String,
 }
 
-/// Encode a varint (used throughout the MC protocol).
-pub fn varint(mut v: i32) -> Vec<u8> {
+/// Encode a varint (used throughout the MC protocol). Negative values are
+/// encoded as their 32-bit two's-complement (e.g. protocol -1 → FF FF FF FF 0F).
+pub fn varint(v: i32) -> Vec<u8> {
     let mut out = Vec::new();
+    let mut uv = v as u32;
     loop {
-        let mut b = (v & 0x7f) as u8;
-        v >>= 7;
-        if v != 0 {
+        let mut b = (uv & 0x7f) as u8;
+        uv >>= 7;
+        if uv != 0 {
             b |= 0x80;
         }
         out.push(b);
-        if v == 0 {
+        if uv == 0 {
             break;
         }
     }
@@ -149,6 +151,15 @@ mod tests {
         }
         assert!(read_varint(&[0x80]).is_none() || read_varint(&[0x80]).is_some()); // truncated
         assert_eq!(read_varint(&[0x80, 0x80, 0x80, 0x80, 0x80, 0x80]), None); // >5 bytes
+    }
+
+    #[test]
+    fn varint_negative_encodes_as_twos_complement() {
+        // Protocol -1 must encode to FF FF FF FF 0F (and terminate!).
+        assert_eq!(varint(-1), vec![0xff, 0xff, 0xff, 0xff, 0x0f]);
+        assert_eq!(read_varint(&varint(-1)).unwrap().0, -1);
+        assert_eq!(varint(0), vec![0x00]);
+        assert_eq!(varint(300), vec![0xac, 0x02]);
     }
 
     #[test]

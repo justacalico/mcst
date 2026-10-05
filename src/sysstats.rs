@@ -1,7 +1,7 @@
 //! Host system metrics for the dashboard.
 
 use serde::Serialize;
-use sysinfo::{Disks, System};
+use sysinfo::System;
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct SystemStats {
@@ -39,18 +39,9 @@ pub async fn collect(data_dir: &std::path::Path) -> SystemStats {
         .sum::<f64>()
         / sys.cpus().len().max(1) as f64;
 
-    let disks = Disks::new_with_refreshed_list();
-    // Find the disk that best (longest-prefix) covers the data dir.
-    let (mut dtotal, mut dused) = (0u64, 0u64);
-    let mut best = 0usize;
-    for d in disks.list() {
-        let mp = d.mount_point();
-        if data_dir.starts_with(mp) && mp.as_os_str().len() >= best {
-            best = mp.as_os_str().len();
-            dtotal = d.total_space();
-            dused = d.total_space().saturating_sub(d.available_space());
-        }
-    }
+    // statvfs the data dir directly — enumerating all mounts can stall on
+    // hung network filesystems.
+    let (dtotal, dused) = disk_usage(data_dir);
 
     let load = System::load_average();
     SystemStats {
@@ -71,6 +62,42 @@ pub async fn collect(data_dir: &std::path::Path) -> SystemStats {
         load_avg: [load.one, load.five, load.fifteen],
         data_dir_bytes: crate::files::dir_size(data_dir).await,
     }
+}
+
+/// Total/used bytes of the filesystem containing `path`; (0,0) on failure.
+#[cfg(unix)]
+fn disk_usage(path: &std::path::Path) -> (u64, u64) {
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(c) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+        return (0, 0);
+    };
+    unsafe {
+        let mut st: libc::statvfs = std::mem::zeroed();
+        if libc::statvfs(c.as_ptr(), &mut st) != 0 {
+            return (0, 0);
+        }
+        let total = st.f_blocks as u64 * st.f_frsize as u64;
+        let avail = st.f_bavail as u64 * st.f_frsize as u64;
+        (total, total.saturating_sub(avail))
+    }
+}
+
+#[cfg(not(unix))]
+fn disk_usage(path: &std::path::Path) -> (u64, u64) {
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let mut best = 0usize;
+    let mut out = (0u64, 0u64);
+    for d in disks.list() {
+        let mp = d.mount_point();
+        if path.starts_with(mp) && mp.as_os_str().len() >= best {
+            best = mp.as_os_str().len();
+            out = (
+                d.total_space(),
+                d.total_space().saturating_sub(d.available_space()),
+            );
+        }
+    }
+    out
 }
 
 /// Format bytes human-readably (KiB, MiB, ...).
@@ -125,7 +152,9 @@ mod tests {
 
     #[tokio::test]
     async fn collect_works() {
-        let s = collect(std::path::Path::new("/")).await;
+        let d = tempfile::tempdir().unwrap();
+        let s = collect(d.path()).await;
+        assert!(s.disk_total > 0);
         assert!(s.mem_total > 0);
         assert!(s.cpu_count > 0);
     }
