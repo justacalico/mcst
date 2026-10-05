@@ -78,7 +78,7 @@ class _ServerDetailPageState extends State<ServerDetailPage>
           StatusBadge(server.status.name),
         ]),
         actions: [
-          if (!active)
+          if (!server.status.isBusy)
             IconButton(
                 tooltip: 'Start',
                 icon: const Icon(Icons.play_arrow),

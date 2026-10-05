@@ -30,7 +30,7 @@ class _ServerSettingsTabState extends State<ServerSettingsTab> {
 
   ApiClient get api => context.read<AppState>().api;
 
-  bool get _stopped => !widget.server.status.isActive;
+  bool get _stopped => !widget.server.status.isBusy;
 
   @override
   void initState() {

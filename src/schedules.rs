@@ -74,6 +74,9 @@ pub fn validate(
         "command" if payload.trim().is_empty() => {
             return Err("command schedules need a command".into())
         }
+        "command" if payload.contains(['\n', '\r']) => {
+            return Err("command must be a single line".into())
+        }
         "command" | "start" | "stop" | "restart" | "backup" => {}
         _ => return Err(format!("unknown action '{action}'")),
     }
@@ -118,7 +121,8 @@ pub async fn execute(mgr: &ServerManager, db: &Db, s: &ScheduleRow) -> Result<()
                 .ok()
                 .flatten()
                 .and_then(|v| v.parse::<usize>().ok())
-                .unwrap_or(10);
+                .unwrap_or(10)
+                .max(1);
             crate::backups::prune(db, &s.server_id, keep).await.ok();
         }
         _ => {}

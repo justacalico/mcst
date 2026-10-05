@@ -55,7 +55,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
         _java = java;
       });
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     }
   }
 
@@ -137,7 +137,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
       nav.pushReplacement(MaterialPageRoute(
           builder: (_) => ServerDetailPage(serverId: s.id)));
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -230,7 +230,9 @@ class _CreateServerPageState extends State<CreateServerPage> {
 
   bool _canContinue() => switch (_step) {
         0 => _type != null,
-        1 => _version != null && (!_hasLoaderStep || _loader != null),
+        1 =>
+          _type == 'custom' ||
+              (_version != null && (!_hasLoaderStep || _loader != null)),
         2 =>
           _name.text.trim().isNotEmpty &&
               (int.tryParse(_port.text) ?? 0) >= 1024 &&
@@ -289,8 +291,13 @@ class _CreateServerPageState extends State<CreateServerPage> {
 
   Widget _versionPicker() {
     if (_type == null) return const Text('Pick a type first.');
+    if (_type == 'custom') {
+      return const Text(
+          'Custom servers run a jar you drop in — no download needed.');
+    }
     final widgets = <Widget>[
       DropdownMenu<String>(
+        key: ValueKey('ver-$_type-$_version'),
         label: const Text('Minecraft version'),
         initialSelection: _version,
         dropdownMenuEntries: [

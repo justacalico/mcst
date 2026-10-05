@@ -82,7 +82,11 @@ pub async fn upload(
     let mut dir = String::new();
     // Buffer files first — the `path` field may arrive after `file`.
     let mut pending: Vec<(String, axum::body::Bytes)> = Vec::new();
-    while let Ok(Some(field)) = multipart.next_field().await {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?
+    {
         match field.name() {
             Some("path") => dir = field.text().await.unwrap_or_default(),
             Some("file") => {

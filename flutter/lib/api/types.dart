@@ -22,6 +22,8 @@ enum ServerStatus {
   String get label => name;
   bool get isActive =>
       this == starting || this == running || this == stopping;
+  /// Active or mid-install — edit/delete/update must wait for idle.
+  bool get isBusy => isActive || this == installing;
 }
 
 /// A managed Minecraft server (record + live runtime fields).

@@ -83,9 +83,11 @@ impl Runtime {
         *self.status.read().await
     }
 
-    /// Set the status without emitting an event (install flow).
+    /// Set the status (install flow) — still emits so the UI transitions.
     pub async fn force_status(&self, status: ServerStatus) {
         *self.status.write().await = status;
+        let id = self.record.read().await.id.clone();
+        let _ = self.events.send(PanelEvent::status(&id, status));
     }
 
     pub async fn push_log(&self, line: String) {
@@ -275,6 +277,11 @@ impl ServerManager {
         // Serialize check + spawn: two concurrent starts (manual vs. crash
         // supervisor) must not both launch a process.
         let _guard = rt.start_lock.lock().await;
+        // Bail before touching flags: a start racing an in-progress stop must
+        // not clear manual_stop and crash-revive the server.
+        if rt.status().await.is_busy() {
+            bail!("server is already running or installing");
+        }
         if manual {
             rt.manual_stop.store(false, Ordering::SeqCst);
             rt.crash_restarts.store(0, Ordering::SeqCst);
@@ -283,9 +290,6 @@ impl ServerManager {
             // queued — honor it instead of reviving the process.
             self.set_status(&rt, ServerStatus::Stopped).await;
             return Ok(());
-        }
-        if rt.status().await.is_active() {
-            bail!("server is already running");
         }
         let rec = rt.record.read().await.clone();
         let dir = PathBuf::from(&rec.dir);
@@ -329,9 +333,6 @@ impl ServerManager {
             .spawn()
             .with_context(|| format!("failed to launch '{program}' — is Java installed?"))?;
 
-        if let Some(pid) = child.id() {
-            rt.child_pid.store(pid, Ordering::SeqCst);
-        }
         let stdin = child
             .stdin
             .take()
@@ -344,6 +345,11 @@ impl ServerManager {
             .stderr
             .take()
             .ok_or_else(|| anyhow!("failed to capture server stderr"))?;
+        // Store the pid only after all pipes are captured — a partial failure
+        // must not leave a killable pid for a dead child.
+        if let Some(pid) = child.id() {
+            rt.child_pid.store(pid, Ordering::SeqCst);
+        }
         *rt.stdin.lock().await = Some(stdin);
         *rt.started_at.write().await = Some(Instant::now());
         rt.players.write().await.names.clear();
@@ -386,8 +392,14 @@ impl ServerManager {
             .ok_or_else(|| anyhow!("server is not running"))?;
         let mut line = cmd.trim_end().to_string();
         line.push('\n');
-        stdin.write_all(line.as_bytes()).await?;
-        stdin.flush().await?;
+        // Bound the write — a wedged child that stops reading stdin must not
+        // block stop() forever.
+        tokio::time::timeout(Duration::from_secs(3), stdin.write_all(line.as_bytes()))
+            .await
+            .context("timed out writing to server stdin")??;
+        tokio::time::timeout(Duration::from_secs(3), stdin.flush())
+            .await
+            .context("timed out flushing server stdin")??;
         Ok(())
     }
 
@@ -396,6 +408,8 @@ impl ServerManager {
         let rt = self.runtime(id).await?;
         // Mark manual intent first — also cancels a queued crash restart.
         rt.manual_stop.store(true, Ordering::SeqCst);
+        // Wait out an in-flight spawn so the stop can't be silently ignored.
+        drop(rt.start_lock.lock().await);
         if !rt.status().await.is_active() {
             return Ok(());
         }
@@ -420,6 +434,7 @@ impl ServerManager {
     pub async fn kill(&self, id: &str) -> Result<()> {
         let rt = self.runtime(id).await?;
         rt.manual_stop.store(true, Ordering::SeqCst);
+        drop(rt.start_lock.lock().await);
         // Clear first to shrink the pid-reuse window before on_process_exit.
         let pid = rt.child_pid.swap(0, Ordering::SeqCst);
         if pid != 0 {
@@ -452,6 +467,7 @@ impl ServerManager {
         *rt.last_exit.write().await = code;
         *rt.stdin.lock().await = None;
         rt.child_pid.store(0, Ordering::SeqCst);
+        *rt.started_at.write().await = None;
         rt.set_stats(0.0, 0);
         rt.players.write().await.names.clear();
         let id = rt.record.read().await.id.clone();
@@ -582,13 +598,18 @@ impl ServerManager {
                     players.max = info.players_max;
                     if info.players_online == 0 {
                         players.names.clear();
+                    } else {
+                        // Someone is connected — keep the empty-stop timer
+                        // honest even if join lines were missed.
+                        *rt.last_nonempty.write().await = Instant::now();
                     }
+                    let names: Vec<String> = players.names.iter().cloned().collect();
                     drop(players);
                     mgr.emit(PanelEvent::players(
                         &rec.id,
                         info.players_online,
                         info.players_max,
-                        &[],
+                        &names,
                     ))
                     .await;
                 }

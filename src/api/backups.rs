@@ -56,7 +56,8 @@ pub async fn create(
             .ok()
             .flatten()
             .and_then(|v| v.parse::<usize>().ok())
-            .unwrap_or(10);
+            .unwrap_or(10)
+            .max(1);
     crate::backups::prune(&s.db, &id, keep).await.ok();
     s.db.audit(&user.username, "backup_create", &id).await.ok();
     Ok(Json(serde_json::json!({"backup": row})))

@@ -102,8 +102,8 @@ pub async fn update(
         .runtime(&id)
         .await
         .map_err(|_| ApiError::not_found("server not found"))?;
-    if rt.status().await.is_active() {
-        return Err(ApiError::conflict("stop the server before editing it"));
+    if rt.status().await.is_busy() {
+        return Err(ApiError::conflict("wait for the server to be idle first"));
     }
     let mut rec = rt.record.read().await.clone();
     if let Some(v) = patch.name {
@@ -171,8 +171,8 @@ pub async fn delete(
         .runtime(&id)
         .await
         .map_err(|_| ApiError::not_found("server not found"))?;
-    if rt.status().await.is_active() {
-        return Err(ApiError::conflict("stop the server before deleting it"));
+    if rt.status().await.is_busy() {
+        return Err(ApiError::conflict("wait for the server to be idle first"));
     }
     let rec = rt.record.read().await.clone();
     s.manager.evict(&id).await;
@@ -244,8 +244,8 @@ pub async fn update_jar(
         .runtime(&id)
         .await
         .map_err(|_| ApiError::not_found("server not found"))?;
-    if rt.status().await.is_active() {
-        return Err(ApiError::conflict("stop the server before updating"));
+    if rt.status().await.is_busy() {
+        return Err(ApiError::conflict("wait for the server to be idle first"));
     }
     crate::install::update_server(&s.http, &s.catalog, &rt)
         .await

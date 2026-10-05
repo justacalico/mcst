@@ -81,7 +81,7 @@ class _SetupPageState extends State<SetupPage> {
           .read<AppState>()
           .completeSetup(_user.text.trim(), _pass.text);
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -166,7 +166,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await context.read<AppState>().login(_user.text.trim(), _pass.text);
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

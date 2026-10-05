@@ -42,6 +42,10 @@ impl ServerStatus {
     pub fn is_active(self) -> bool {
         matches!(self, Self::Starting | Self::Running | Self::Stopping)
     }
+    /// Active or mid-install — blocks delete/edit/update-jar.
+    pub fn is_busy(self) -> bool {
+        self.is_active() || self == Self::Installing
+    }
     pub fn label(self) -> &'static str {
         match self {
             Self::Stopped => "stopped",

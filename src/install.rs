@@ -111,15 +111,22 @@ async fn run_installer(java: &str, installer: &Path, dir: &Path, rt: &Arc<Runtim
         .current_dir(dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .kill_on_drop(true)
         .spawn()
         .context("failed to launch installer — is Java installed?")?;
 
     let out = child.stdout.take().unwrap();
     let err = child.stderr.take().unwrap();
     use tokio::io::AsyncBufReadExt;
-    let mut lines = tokio::io::BufReader::new(out).lines();
-    // Drain stderr in its own task — a chatty installer blocking on a full
-    // stderr pipe would deadlock the wait below.
+    // Drain both pipes in tasks — a quiet-but-live installer must not keep the
+    // wait below from timing out, and a full stderr must not deadlock it.
+    let rt_out = rt.clone();
+    let out_task = tokio::spawn(async move {
+        let mut lines = tokio::io::BufReader::new(out).lines();
+        while let Ok(Some(l)) = lines.next_line().await {
+            log(&rt_out, format!("[installer] {l}")).await;
+        }
+    });
     let rt_err = rt.clone();
     let err_task = tokio::spawn(async move {
         let mut elines = tokio::io::BufReader::new(err).lines();
@@ -127,12 +134,10 @@ async fn run_installer(java: &str, installer: &Path, dir: &Path, rt: &Arc<Runtim
             log(&rt_err, format!("[installer] {l}")).await;
         }
     });
-    while let Ok(Some(l)) = lines.next_line().await {
-        log(rt, format!("[installer] {l}")).await;
-    }
     let status = tokio::time::timeout(std::time::Duration::from_secs(1800), child.wait())
         .await
         .map_err(|_| anyhow::anyhow!("installer timed out after 30m"))??;
+    out_task.abort();
     err_task.abort();
     if !status.success() {
         bail!("installer exited with {status}");
