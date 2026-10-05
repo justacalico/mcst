@@ -142,6 +142,11 @@ github-release-sync:
   tags: [linux-truenas]
   image: alpine:3.19
   resource_group: release-sync
+  # CI_JOB_TOKEN can't create releases (401) — use the GITLAB_TOKEN PAT
+  # instead of job-token autologin.
+  variables:
+    GLAB_ENABLE_CI_AUTOLOGIN: "false"
+    GITLAB_HOST: "gitlab.com"
   rules:
     - if: $CI_PIPELINE_SOURCE == "trigger"
     - if: $CI_PIPELINE_SOURCE == "api"
