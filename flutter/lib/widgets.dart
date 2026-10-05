@@ -120,7 +120,8 @@ class StatCard extends StatelessWidget {
   }
 }
 
-/// Colored chip carrying a server-type initial.
+/// Rounded chip carrying the server type's real logo; falls back to a
+/// colored initial for unknown types.
 class ServerTypeAvatar extends StatelessWidget {
   final String serverType;
   final double size;
@@ -136,10 +137,20 @@ class ServerTypeAvatar extends StatelessWidget {
     'custom': Color(0xFF78909C),
   };
 
+  static const _assets = {
+    'vanilla': 'assets/icons/vanilla.png',
+    'paper': 'assets/icons/paper.png',
+    'purpur': 'assets/icons/purpur.png',
+    'fabric': 'assets/icons/fabric.png',
+    'forge': 'assets/icons/forge.jpg',
+    'neoforge': 'assets/icons/neoforge.png',
+    'custom': 'assets/icons/custom.png',
+  };
+
   @override
   Widget build(BuildContext context) {
     final c = colors[serverType] ?? colors['custom']!;
-    final initial = serverType.isEmpty ? '?' : serverType[0].toUpperCase();
+    final asset = _assets[serverType];
     return Container(
       width: size,
       height: size,
@@ -149,10 +160,22 @@ class ServerTypeAvatar extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: c.withAlpha(90)),
       ),
-      child: Text(initial,
-          style: TextStyle(
-              color: c, fontWeight: FontWeight.w800, fontSize: size * 0.45)),
+      clipBehavior: Clip.antiAlias,
+      child: asset != null
+          ? Image.asset(asset,
+              width: size * 0.82,
+              height: size * 0.82,
+              filterQuality: FilterQuality.low,
+              errorBuilder: (_, _, _) => _initial(c))
+          : _initial(c),
     );
+  }
+
+  Widget _initial(Color c) {
+    final initial = serverType.isEmpty ? '?' : serverType[0].toUpperCase();
+    return Text(initial,
+        style: TextStyle(
+            color: c, fontWeight: FontWeight.w800, fontSize: size * 0.45));
   }
 }
 
