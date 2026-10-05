@@ -62,7 +62,11 @@ fi
 if [ -n "${GITLAB_RELEASE_SSH_KEY:-}" ]; then
   git remote add gitlab-ssh "git@gitlab.com:${CI_PROJECT_PATH}.git" 2>/dev/null || true
   git tag -f "$RELEASE_TAG" "$RELEASE_COMMIT"
-  git push -f gitlab-ssh "$RELEASE_TAG"
+  # Best effort — protected tags may reject deploy-key pushes; the tag is
+  # already correct when it was pushed during the release flow.
+  if ! git push -f gitlab-ssh "$RELEASE_TAG"; then
+    echo "warning: tag push to GitLab rejected (protected tag?) — continuing" >&2
+  fi
 fi
 
 # Mirror to a GitLab release. The tag is kept the same as GitHub.
