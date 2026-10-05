@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -115,7 +114,7 @@ void main() {
       final mock = MockClient((req) async {
         if (req.method == 'PUT') {
           ct = req.headers['content-type'];
-          body = (req as http.Request).body;
+          body = req.body;
           return http.Response('{}', 200);
         }
         return http.Response('motd=hello\n', 200,

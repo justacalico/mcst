@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mcst_frontend/api/types.dart';
 import 'package:mcst_frontend/state/app_state.dart';
-import 'package:mcst_frontend/views/server/settings_tab.dart';
 import 'package:mcst_frontend/views/server_detail_page.dart';
 
 import 'fake_client.dart';
