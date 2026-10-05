@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## v0.2.0 - 2026-10-05
+#### Features
+- 服务器类型使用真实品牌图标替代首字母 - (43af4fe) - HttpAnimations
+
+- - -
+
 ## v0.1.1 - 2026-10-05
 #### Bug Fixes
 - 预建容器数据目录并归属 mcst 用户 - (9c57de0) - HttpAnimations
