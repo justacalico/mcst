@@ -299,6 +299,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
       DropdownMenu<String>(
         key: ValueKey('ver-$_type-$_version'),
         label: const Text('Minecraft version'),
+        expandedInsets: EdgeInsets.zero,
         initialSelection: _version,
         dropdownMenuEntries: [
           for (final v in _versions)
@@ -312,6 +313,7 @@ class _CreateServerPageState extends State<CreateServerPage> {
       widgets.add(DropdownMenu<String>(
         key: ValueKey('loader-$_loader'),
         label: const Text('Loader / build'),
+        expandedInsets: EdgeInsets.zero,
         initialSelection: _loader,
         dropdownMenuEntries: [
           for (final l in _loaders)
@@ -320,7 +322,10 @@ class _CreateServerPageState extends State<CreateServerPage> {
         onSelected: (v) => setState(() => _loader = v),
       ));
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: widgets);
+    // The vertical Stepper centers step content — stretch so the dropdowns
+    // fill the column instead of floating centered.
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch, children: widgets);
   }
 
   Widget _options() {
