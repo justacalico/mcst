@@ -81,7 +81,9 @@ class DashboardPage extends StatelessWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 2.3,
+                  // Fixed height — on portrait windows a 1-column grid would
+                  // otherwise stretch each card with the full width.
+                  mainAxisExtent: 132,
                   children: [
                     for (final s in app.servers)
                       ServerCard(
@@ -116,7 +118,7 @@ class _StatsRow extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 2.4,
+        mainAxisExtent: 128,
         children: [
           StatCard(Icons.memory, 'CPU',
               '${stats.cpuPercent.toStringAsFixed(0)}%',

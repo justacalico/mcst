@@ -50,7 +50,14 @@ Future<void> pumpPage(
 /// Bounded pump — `pumpAndSettle` never finishes while periodic timers
 /// (stats ticker, console uptime) keep scheduling frames.
 Future<void> settle(WidgetTester tester, [int frames = 20]) async {
+  // Let real async work (asset image decode, WS) land between the
+  // fake-time pumps — otherwise Image.asset races the golden capture.
+  await tester.runAsync(() => Future<void>.delayed(
+      const Duration(milliseconds: 100)));
   for (var i = 0; i < frames; i++) {
     await tester.pump(const Duration(milliseconds: 100));
   }
+  await tester.runAsync(() => Future<void>.delayed(
+      const Duration(milliseconds: 50)));
+  await tester.pump();
 }

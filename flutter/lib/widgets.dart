@@ -162,11 +162,11 @@ class ServerTypeAvatar extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: asset != null
-          ? Image.asset(asset,
-              width: size * 0.82,
-              height: size * 0.82,
-              filterQuality: FilterQuality.low,
-              errorBuilder: (_, _, _) => _initial(c))
+          ? SizedBox.expand(
+              child: Image.asset(asset,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
+                  errorBuilder: (_, _, _) => Center(child: _initial(c))))
           : _initial(c),
     );
   }
