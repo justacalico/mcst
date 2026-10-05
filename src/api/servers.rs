@@ -14,7 +14,10 @@ use crate::servers::types::{ServerRecord, ServerStatus};
 use crate::servers::CreateServer;
 use crate::AppState;
 
-pub async fn list(State(s): State<Arc<AppState>>, _u: AuthUser) -> ApiResult<Json<serde_json::Value>> {
+pub async fn list(
+    State(s): State<Arc<AppState>>,
+    _u: AuthUser,
+) -> ApiResult<Json<serde_json::Value>> {
     let servers = s.manager.list_dtos().await?;
     Ok(Json(serde_json::json!({"servers": servers})))
 }
@@ -24,7 +27,11 @@ pub async fn get(
     _u: AuthUser,
     Path(id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let dto = s.manager.dto(&id).await.map_err(|_| ApiError::not_found("server not found"))?;
+    let dto = s
+        .manager
+        .dto(&id)
+        .await
+        .map_err(|_| ApiError::not_found("server not found"))?;
     Ok(Json(serde_json::to_value(dto).unwrap_or_default()))
 }
 
@@ -48,7 +55,13 @@ pub async fn create(
     s.db.insert_server(&record).await?;
     let rt = s.manager.runtime(&id).await?;
     rt.force_status(ServerStatus::Installing).await;
-    s.db.audit(&user.username, "server_create", &format!("{} ({})", req.name, req.server_type)).await.ok();
+    s.db.audit(
+        &user.username,
+        "server_create",
+        &format!("{} ({})", req.name, req.server_type),
+    )
+    .await
+    .ok();
 
     // Install in the background; progress streams into the console log.
     let catalog = s.catalog.clone();
@@ -84,7 +97,11 @@ pub async fn update(
     Path(id): Path<String>,
     Json(patch): Json<PatchServer>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let rt = s.manager.runtime(&id).await.map_err(|_| ApiError::not_found("server not found"))?;
+    let rt = s
+        .manager
+        .runtime(&id)
+        .await
+        .map_err(|_| ApiError::not_found("server not found"))?;
     if rt.status().await.is_active() {
         return Err(ApiError::conflict("stop the server before editing it"));
     }
@@ -149,7 +166,11 @@ pub async fn delete(
     user: AuthUser,
     Path(id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let rt = s.manager.runtime(&id).await.map_err(|_| ApiError::not_found("server not found"))?;
+    let rt = s
+        .manager
+        .runtime(&id)
+        .await
+        .map_err(|_| ApiError::not_found("server not found"))?;
     if rt.status().await.is_active() {
         return Err(ApiError::conflict("stop the server before deleting it"));
     }
@@ -160,7 +181,9 @@ pub async fn delete(
     let _ = tokio::fs::remove_dir_all(&dir).await;
     let bk = crate::backups::backups_root(&s.config.backups_dir(), &id);
     let _ = tokio::fs::remove_dir_all(&bk).await;
-    s.db.audit(&user.username, "server_delete", &rec.name).await.ok();
+    s.db.audit(&user.username, "server_delete", &rec.name)
+        .await
+        .ok();
     Ok(Json(serde_json::json!({"ok": true})))
 }
 
@@ -216,14 +239,20 @@ pub async fn update_jar(
     user: AuthUser,
     Path(id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let rt = s.manager.runtime(&id).await.map_err(|_| ApiError::not_found("server not found"))?;
+    let rt = s
+        .manager
+        .runtime(&id)
+        .await
+        .map_err(|_| ApiError::not_found("server not found"))?;
     if rt.status().await.is_active() {
         return Err(ApiError::conflict("stop the server before updating"));
     }
     crate::install::update_server(&s.http, &s.catalog, &rt)
         .await
         .map_err(|e| ApiError::bad_request(e.to_string()))?;
-    s.db.audit(&user.username, "server_update_jar", &id).await.ok();
+    s.db.audit(&user.username, "server_update_jar", &id)
+        .await
+        .ok();
     Ok(Json(serde_json::json!({"ok": true})))
 }
 
@@ -303,7 +332,10 @@ pub async fn set_icon(
     let rec = server_record(&s, &id).await?;
     while let Ok(Some(field)) = multipart.next_field().await {
         if field.name() == Some("icon") {
-            let bytes = field.bytes().await.map_err(|e| ApiError::bad_request(e.to_string()))?;
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| ApiError::bad_request(e.to_string()))?;
             if bytes.len() > 2 * 1024 * 1024 {
                 return Err(ApiError::bad_request("icon too large (2 MiB max)"));
             }
@@ -338,15 +370,20 @@ pub async fn tailscale_tcp(
             .await
             .map_err(|e| ApiError::bad_request(e.to_string()))?;
         s.db.set_setting(&key, &tport.to_string()).await?;
-        s.db.audit(&user.username, "tailscale_serve", &format!("{id} tcp:{tport}")).await.ok();
+        s.db.audit(
+            &user.username,
+            "tailscale_serve",
+            &format!("{id} tcp:{tport}"),
+        )
+        .await
+        .ok();
         Ok(Json(serde_json::json!({"ok": true, "tailnet_port": tport})))
     } else {
-        let tport = s
-            .db
-            .get_setting(&key)
-            .await?
-            .and_then(|v| v.parse::<u16>().ok())
-            .unwrap_or(rec.port as u16);
+        let tport =
+            s.db.get_setting(&key)
+                .await?
+                .and_then(|v| v.parse::<u16>().ok())
+                .unwrap_or(rec.port as u16);
         s.tailscale
             .unserve_tcp(tport)
             .await

@@ -25,11 +25,10 @@ pub async fn search(
     Path(id): Path<String>,
     Query(q): Query<SearchQuery>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let rec = s
-        .db
-        .get_server(&id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("server not found"))?;
+    let rec =
+        s.db.get_server(&id)
+            .await?
+            .ok_or_else(|| ApiError::not_found("server not found"))?;
     let loader = crate::servers::types::ServerType::parse(&rec.server_type)
         .and_then(|t| t.modrinth_facets())
         .ok_or_else(|| ApiError::bad_request("this server type doesn't support mods/plugins"))?;
@@ -62,11 +61,10 @@ pub async fn install(
     Path(id): Path<String>,
     Json(req): Json<InstallReq>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let rec = s
-        .db
-        .get_server(&id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("server not found"))?;
+    let rec =
+        s.db.get_server(&id)
+            .await?
+            .ok_or_else(|| ApiError::not_found("server not found"))?;
     let dir_name = crate::modrinth::content_dir(&PathBuf::from(&rec.dir), &rec.server_type)
         .map_err(|e| ApiError::bad_request(e.to_string()))?;
     let loader = crate::servers::types::ServerType::parse(&rec.server_type)
@@ -81,7 +79,13 @@ pub async fn install(
     )
     .await
     .map_err(|e| ApiError::bad_request(e.to_string()))?;
-    s.db.audit(&user.username, "mod_install", &format!("{id}:{}", req.project)).await.ok();
+    s.db.audit(
+        &user.username,
+        "mod_install",
+        &format!("{id}:{}", req.project),
+    )
+    .await
+    .ok();
     Ok(Json(serde_json::json!({"ok": true, "file": filename})))
 }
 
@@ -91,11 +95,10 @@ pub async fn installed(
     _u: AuthUser,
     Path(id): Path<String>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let rec = s
-        .db
-        .get_server(&id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("server not found"))?;
+    let rec =
+        s.db.get_server(&id)
+            .await?
+            .ok_or_else(|| ApiError::not_found("server not found"))?;
     let dir_name = crate::servers::types::ServerType::parse(&rec.server_type)
         .map(|t| t.content_dir())
         .unwrap_or("mods");

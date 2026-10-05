@@ -24,7 +24,16 @@ pub async fn install_server(
     let dir = PathBuf::from(&rec.dir);
     tokio::fs::create_dir_all(&dir).await?;
 
-    log(rt, format!("[mcst] installing {} {} into {}", rec.server_type, rec.mc_version, dir.display())).await;
+    log(
+        rt,
+        format!(
+            "[mcst] installing {} {} into {}",
+            rec.server_type,
+            rec.mc_version,
+            dir.display()
+        ),
+    )
+    .await;
 
     let plan = catalog
         .plan(&rec.server_type, &rec.mc_version, &rec.loader_version)
@@ -40,12 +49,20 @@ pub async fn install_server(
             let installer = dir.join(&filename);
             log(rt, format!("[mcst] downloading {url}")).await;
             download(http, &url, &installer).await?;
-            log(rt, "[mcst] running installer (this can take a minute)".into()).await;
+            log(
+                rt,
+                "[mcst] running installer (this can take a minute)".into(),
+            )
+            .await;
             run_installer(&rec.java_path, &installer, &dir, rt).await?;
             let _ = tokio::fs::remove_file(&installer).await;
         }
         DownloadPlan::None => {
-            log(rt, "[mcst] custom server — upload a jar named server.jar via Files".into()).await;
+            log(
+                rt,
+                "[mcst] custom server — upload a jar named server.jar via Files".into(),
+            )
+            .await;
         }
     }
 

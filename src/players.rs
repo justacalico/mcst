@@ -85,7 +85,9 @@ pub async fn lookup(http: &reqwest::Client, name: &str) -> Result<(String, Strin
     }
     let url = format!("https://api.mojang.com/users/profiles/minecraft/{name}");
     let res = http.get(&url).send().await?;
-    if res.status() == reqwest::StatusCode::NO_CONTENT || res.status() == reqwest::StatusCode::NOT_FOUND {
+    if res.status() == reqwest::StatusCode::NO_CONTENT
+        || res.status() == reqwest::StatusCode::NOT_FOUND
+    {
         anyhow::bail!("player '{name}' not found");
     }
     let p: Prof = res.json().await?;
@@ -177,7 +179,11 @@ pub async fn remove(
     Ok(entries)
 }
 
-async fn write_list(server_dir: &Path, kind: ListKind, entries: &[PlayerEntry]) -> Result<(), ApiError> {
+async fn write_list(
+    server_dir: &Path,
+    kind: ListKind,
+    entries: &[PlayerEntry],
+) -> Result<(), ApiError> {
     let p = server_dir.join(kind.file());
     tokio::fs::write(&p, serde_json::to_string_pretty(entries)?).await?;
     Ok(())
@@ -196,8 +202,7 @@ pub fn offline_uuid(name: &str) -> String {
 
 /// Minecraft name rules: 3-16 chars, alphanumeric + underscore.
 pub fn valid_name(name: &str) -> bool {
-    (3..=16).contains(&name.len())
-        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    (3..=16).contains(&name.len()) && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 #[cfg(test)]
@@ -223,10 +228,7 @@ mod tests {
     #[test]
     fn uuid_helpers() {
         let raw = "069a79f444e94726a5befca90e38aaf5";
-        assert_eq!(
-            dash_uuid(raw),
-            "069a79f4-44e9-4726-a5be-fca90e38aaf5"
-        );
+        assert_eq!(dash_uuid(raw), "069a79f4-44e9-4726-a5be-fca90e38aaf5");
         assert_eq!(dash_uuid("already-dashed-x"), "already-dashed-x");
         assert_eq!(undash_uuid("a-b"), "ab");
         let off = offline_uuid("Steve");

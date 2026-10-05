@@ -35,11 +35,10 @@ pub async fn create(
     Path(id): Path<String>,
     Json(req): Json<CreateReq>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let rec = s
-        .db
-        .get_server(&id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("server not found"))?;
+    let rec =
+        s.db.get_server(&id)
+            .await?
+            .ok_or_else(|| ApiError::not_found("server not found"))?;
     // If running, ask the server to save first.
     let _ = s.manager.send_command(&id, "save-all flush").await;
     let note = crate::backups::clean_note(&req.note);
@@ -68,15 +67,16 @@ pub async fn restore(
     if rt.status().await != ServerStatus::Stopped {
         return Err(ApiError::conflict("stop the server before restoring"));
     }
-    let b = s
-        .db
-        .get_backup(&bid)
-        .await?
-        .filter(|b| b.server_id == id)
-        .ok_or_else(|| ApiError::not_found("backup not found"))?;
+    let b =
+        s.db.get_backup(&bid)
+            .await?
+            .filter(|b| b.server_id == id)
+            .ok_or_else(|| ApiError::not_found("backup not found"))?;
     let rec = rt.record.read().await.clone();
     crate::backups::restore(std::path::Path::new(&b.path), &PathBuf::from(&rec.dir)).await?;
-    s.db.audit(&user.username, "backup_restore", &format!("{id}:{bid}")).await.ok();
+    s.db.audit(&user.username, "backup_restore", &format!("{id}:{bid}"))
+        .await
+        .ok();
     Ok(Json(serde_json::json!({"ok": true})))
 }
 
@@ -85,12 +85,11 @@ pub async fn download(
     _u: AuthUser,
     Path((id, bid)): Path<(String, String)>,
 ) -> ApiResult<axum::response::Response> {
-    let b = s
-        .db
-        .get_backup(&bid)
-        .await?
-        .filter(|b| b.server_id == id)
-        .ok_or_else(|| ApiError::not_found("backup not found"))?;
+    let b =
+        s.db.get_backup(&bid)
+            .await?
+            .filter(|b| b.server_id == id)
+            .ok_or_else(|| ApiError::not_found("backup not found"))?;
     let file = tokio::fs::File::open(&b.path)
         .await
         .map_err(|_| ApiError::not_found("backup file missing"))?;
@@ -111,12 +110,11 @@ pub async fn remove(
     _u: AuthUser,
     Path((id, bid)): Path<(String, String)>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let b = s
-        .db
-        .get_backup(&bid)
-        .await?
-        .filter(|b| b.server_id == id)
-        .ok_or_else(|| ApiError::not_found("backup not found"))?;
+    let b =
+        s.db.get_backup(&bid)
+            .await?
+            .filter(|b| b.server_id == id)
+            .ok_or_else(|| ApiError::not_found("backup not found"))?;
     crate::backups::delete(&s.db, &b.id).await?;
     Ok(Json(serde_json::json!({"ok": true})))
 }

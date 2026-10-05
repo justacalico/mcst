@@ -42,11 +42,7 @@ fn parse(v: &str) -> Parsed {
         if let Some(idx) = v.find(suffix) {
             let base = parse(&v[..idx]);
             let seq = v[idx + suffix.len()..].parse::<u64>().unwrap_or(0);
-            return Parsed {
-                kind,
-                seq,
-                ..base
-            };
+            return Parsed { kind, seq, ..base };
         }
     }
     // Snapshot: `24w14a` → approximate to (0,0,0) + raw ordering.

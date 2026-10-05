@@ -17,7 +17,10 @@ pub struct SetupStatus {
 }
 
 pub async fn status(State(s): State<Arc<AppState>>) -> ApiResult<Json<SetupStatus>> {
-    let count = s.db.user_count().await.map_err(|e| ApiError::internal(e.to_string()))?;
+    let count =
+        s.db.user_count()
+            .await
+            .map_err(|e| ApiError::internal(e.to_string()))?;
     Ok(Json(SetupStatus {
         needs_setup: count == 0 && !s.config.dev_mode,
         dev_mode: s.config.dev_mode,
@@ -42,7 +45,9 @@ pub async fn setup(
     let hash = password::hash(&req.password).map_err(|e| ApiError::internal(e.to_string()))?;
     let uid = s.db.create_user(&req.username, &hash).await?;
     let token = crate::auth::create_session(&s.db, &uid).await?;
-    s.db.audit(&req.username, "setup", "owner account created").await.ok();
+    s.db.audit(&req.username, "setup", "owner account created")
+        .await
+        .ok();
     let cookie = format!(
         "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={}",
         30 * 24 * 3600

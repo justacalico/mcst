@@ -25,7 +25,9 @@ async fn handle(s: Arc<AppState>, sock: WebSocket) {
         loop {
             match rx.recv().await {
                 Ok(ev) => {
-                    let Ok(text) = serde_json::to_string(&ev) else { continue };
+                    let Ok(text) = serde_json::to_string(&ev) else {
+                        continue;
+                    };
                     if tx.send(Message::Text(text.into())).await.is_err() {
                         break;
                     }

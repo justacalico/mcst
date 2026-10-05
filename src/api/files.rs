@@ -15,11 +15,10 @@ use crate::files as fops;
 use crate::AppState;
 
 async fn root(s: &AppState, id: &str) -> ApiResult<PathBuf> {
-    let rec = s
-        .db
-        .get_server(id)
-        .await?
-        .ok_or_else(|| ApiError::not_found("server not found"))?;
+    let rec =
+        s.db.get_server(id)
+            .await?
+            .ok_or_else(|| ApiError::not_found("server not found"))?;
     Ok(PathBuf::from(rec.dir))
 }
 
@@ -37,7 +36,9 @@ pub async fn list(
 ) -> ApiResult<Json<serde_json::Value>> {
     let root = root(&s, &id).await?;
     let entries = fops::list(&root, &q.path).await?;
-    Ok(Json(serde_json::json!({"entries": entries, "path": q.path})))
+    Ok(Json(
+        serde_json::json!({"entries": entries, "path": q.path}),
+    ))
 }
 
 pub async fn read(
@@ -48,7 +49,9 @@ pub async fn read(
 ) -> ApiResult<Json<serde_json::Value>> {
     let root = root(&s, &id).await?;
     let content = fops::read_text(&root, &q.path).await?;
-    Ok(Json(serde_json::json!({"content": content, "path": q.path})))
+    Ok(Json(
+        serde_json::json!({"content": content, "path": q.path}),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -86,8 +89,15 @@ pub async fn upload(
                     .file_name()
                     .map(crate::modrinth::sanitize_filename)
                     .unwrap_or_else(|| "upload.bin".into());
-                let bytes = field.bytes().await.map_err(|e| ApiError::bad_request(e.to_string()))?;
-                let rel = if dir.is_empty() { name.clone() } else { format!("{}/{}", dir.trim_end_matches('/'), name) };
+                let bytes = field
+                    .bytes()
+                    .await
+                    .map_err(|e| ApiError::bad_request(e.to_string()))?;
+                let rel = if dir.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{}/{}", dir.trim_end_matches('/'), name)
+                };
                 fops::write_bytes(&root, &rel, &bytes).await?;
                 saved.push(rel);
             }
@@ -114,7 +124,9 @@ pub async fn download(
         .await
         .map_err(|_| ApiError::not_found("not found"))?;
     if md.is_dir() {
-        return Err(ApiError::bad_request("directories can't be downloaded — use a backup"));
+        return Err(ApiError::bad_request(
+            "directories can't be downloaded — use a backup",
+        ));
     }
     let file = tokio::fs::File::open(&p).await?;
     let name = p

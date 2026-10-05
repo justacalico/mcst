@@ -38,13 +38,48 @@ pub struct TypeInfo {
 
 pub fn type_infos() -> Vec<TypeInfo> {
     vec![
-        TypeInfo { id: "vanilla", name: "Vanilla", has_loader: false, content_dir: "mods" },
-        TypeInfo { id: "paper", name: "Paper", has_loader: false, content_dir: "plugins" },
-        TypeInfo { id: "purpur", name: "Purpur", has_loader: false, content_dir: "plugins" },
-        TypeInfo { id: "fabric", name: "Fabric", has_loader: true, content_dir: "mods" },
-        TypeInfo { id: "forge", name: "Forge", has_loader: true, content_dir: "mods" },
-        TypeInfo { id: "neoforge", name: "NeoForge", has_loader: true, content_dir: "mods" },
-        TypeInfo { id: "custom", name: "Custom jar", has_loader: false, content_dir: "mods" },
+        TypeInfo {
+            id: "vanilla",
+            name: "Vanilla",
+            has_loader: false,
+            content_dir: "mods",
+        },
+        TypeInfo {
+            id: "paper",
+            name: "Paper",
+            has_loader: false,
+            content_dir: "plugins",
+        },
+        TypeInfo {
+            id: "purpur",
+            name: "Purpur",
+            has_loader: false,
+            content_dir: "plugins",
+        },
+        TypeInfo {
+            id: "fabric",
+            name: "Fabric",
+            has_loader: true,
+            content_dir: "mods",
+        },
+        TypeInfo {
+            id: "forge",
+            name: "Forge",
+            has_loader: true,
+            content_dir: "mods",
+        },
+        TypeInfo {
+            id: "neoforge",
+            name: "NeoForge",
+            has_loader: true,
+            content_dir: "mods",
+        },
+        TypeInfo {
+            id: "custom",
+            name: "Custom jar",
+            has_loader: false,
+            content_dir: "mods",
+        },
     ]
 }
 
@@ -99,12 +134,7 @@ impl VersionCatalog {
     }
 
     /// Resolve an install into a download plan.
-    pub async fn plan(
-        &self,
-        server_type: &str,
-        mc: &str,
-        loader: &str,
-    ) -> Result<DownloadPlan> {
+    pub async fn plan(&self, server_type: &str, mc: &str, loader: &str) -> Result<DownloadPlan> {
         let t = ServerType::parse(server_type)
             .with_context(|| format!("unknown server type '{server_type}'"))?;
         match t {

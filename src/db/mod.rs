@@ -31,7 +31,10 @@ impl Db {
             .max_connections(8)
             .connect_with(opts.create_if_missing(true))
             .await?;
-        sqlx::query("PRAGMA journal_mode=WAL").execute(&pool).await.ok();
+        sqlx::query("PRAGMA journal_mode=WAL")
+            .execute(&pool)
+            .await
+            .ok();
         sqlx::query("PRAGMA foreign_keys=ON").execute(&pool).await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         Ok(Self { pool })
@@ -145,16 +148,20 @@ impl Db {
     // ---------- servers ----------
 
     pub async fn list_servers(&self) -> Result<Vec<ServerRecord>> {
-        Ok(sqlx::query_as::<_, ServerRecord>("SELECT * FROM servers ORDER BY created_at")
-            .fetch_all(&self.pool)
-            .await?)
+        Ok(
+            sqlx::query_as::<_, ServerRecord>("SELECT * FROM servers ORDER BY created_at")
+                .fetch_all(&self.pool)
+                .await?,
+        )
     }
 
     pub async fn get_server(&self, id: &str) -> Result<Option<ServerRecord>> {
-        Ok(sqlx::query_as::<_, ServerRecord>("SELECT * FROM servers WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?)
+        Ok(
+            sqlx::query_as::<_, ServerRecord>("SELECT * FROM servers WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?,
+        )
     }
 
     pub async fn insert_server(&self, s: &ServerRecord) -> Result<()> {
@@ -197,7 +204,7 @@ impl Db {
         .bind(&s.server_type)
         .bind(&s.mc_version)
         .bind(&s.loader_version)
-        .bind(&s.port)
+        .bind(s.port)
         .bind(s.memory_mb)
         .bind(s.min_memory_mb)
         .bind(&s.java_path)
@@ -235,10 +242,12 @@ impl Db {
     }
 
     pub async fn get_backup(&self, id: &str) -> Result<Option<BackupRow>> {
-        Ok(sqlx::query_as::<_, BackupRow>("SELECT * FROM backups WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?)
+        Ok(
+            sqlx::query_as::<_, BackupRow>("SELECT * FROM backups WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?,
+        )
     }
 
     pub async fn insert_backup(&self, b: &BackupRow) -> Result<()> {
@@ -281,10 +290,12 @@ impl Db {
     }
 
     pub async fn get_schedule(&self, id: &str) -> Result<Option<ScheduleRow>> {
-        Ok(sqlx::query_as::<_, ScheduleRow>("SELECT * FROM schedules WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?)
+        Ok(
+            sqlx::query_as::<_, ScheduleRow>("SELECT * FROM schedules WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?,
+        )
     }
 
     pub async fn insert_schedule(&self, s: &ScheduleRow) -> Result<()> {
@@ -345,9 +356,11 @@ impl Db {
     // ---------- java installs ----------
 
     pub async fn list_java(&self) -> Result<Vec<JavaRow>> {
-        Ok(sqlx::query_as::<_, JavaRow>("SELECT * FROM java_installs ORDER BY major")
-            .fetch_all(&self.pool)
-            .await?)
+        Ok(
+            sqlx::query_as::<_, JavaRow>("SELECT * FROM java_installs ORDER BY major")
+                .fetch_all(&self.pool)
+                .await?,
+        )
     }
 
     pub async fn insert_java(&self, major: i64, path: &str, managed: bool) -> Result<String> {
@@ -413,12 +426,12 @@ impl Db {
     }
 
     pub async fn audit_log(&self, limit: i64) -> Result<Vec<AuditRow>> {
-        Ok(sqlx::query_as::<_, AuditRow>(
-            "SELECT * FROM audit ORDER BY id DESC LIMIT ?",
+        Ok(
+            sqlx::query_as::<_, AuditRow>("SELECT * FROM audit ORDER BY id DESC LIMIT ?")
+                .bind(limit)
+                .fetch_all(&self.pool)
+                .await?,
         )
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await?)
     }
 }
 

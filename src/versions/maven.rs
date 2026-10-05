@@ -62,9 +62,7 @@ pub fn forge_mc_versions(versions: &[String]) -> Vec<String> {
 pub fn forge_loaders_for(versions: &[String], mc: &str) -> Vec<String> {
     let mut v: Vec<String> = versions
         .iter()
-        .filter_map(|f| {
-            forge_split(f).and_then(|(m, fv)| (m == mc).then(|| format!("{mc}-{fv}")))
-        })
+        .filter_map(|f| forge_split(f).and_then(|(m, fv)| (m == mc).then(|| format!("{mc}-{fv}"))))
         .collect();
     v.sort_by(|a, b| compare::cmp_versions(&b.replace('-', "."), &a.replace('-', ".")));
     v
@@ -83,10 +81,7 @@ pub fn neoforge_for_mc(versions: &[String], mc: &str) -> Vec<String> {
 
 /// All MC versions covered by a NeoForge metadata list.
 pub fn neoforge_mc_versions(versions: &[String]) -> Vec<String> {
-    let mut v: Vec<String> = versions
-        .iter()
-        .filter_map(|n| neoforge_mc(n))
-        .collect();
+    let mut v: Vec<String> = versions.iter().filter_map(|n| neoforge_mc(n)).collect();
     compare::sort_desc(&mut v);
     v
 }

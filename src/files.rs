@@ -207,8 +207,12 @@ mod tests {
     async fn list_sorts_dirs_first() {
         let d = tempfile::tempdir().unwrap();
         tokio::fs::create_dir(d.path().join("zdir")).await.unwrap();
-        tokio::fs::write(d.path().join("a.txt"), b"hi").await.unwrap();
-        tokio::fs::write(d.path().join("m.txt"), b"hi").await.unwrap();
+        tokio::fs::write(d.path().join("a.txt"), b"hi")
+            .await
+            .unwrap();
+        tokio::fs::write(d.path().join("m.txt"), b"hi")
+            .await
+            .unwrap();
         let entries = list(d.path(), "").await.unwrap();
         assert_eq!(entries[0].name, "zdir");
         assert!(entries[0].is_dir);

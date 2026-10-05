@@ -39,7 +39,7 @@ pub fn is_due(s: &ScheduleRow, now: &DateTime<Local>) -> bool {
             Some(v) => v,
             None => return false,
         };
-        let today_due = now.hour() as u32 == h && now.minute() as u32 == m;
+        let today_due = now.hour() == h && now.minute() == m;
         if !today_due {
             return false;
         }
@@ -64,7 +64,12 @@ pub fn parse_hhmm(s: &str) -> Option<(u32, u32)> {
 }
 
 /// Validate a schedule request before insert/update.
-pub fn validate(action: &str, payload: &str, every_minutes: i64, daily_time: &str) -> Result<(), String> {
+pub fn validate(
+    action: &str,
+    payload: &str,
+    every_minutes: i64,
+    daily_time: &str,
+) -> Result<(), String> {
     match action {
         "command" if payload.trim().is_empty() => {
             return Err("command schedules need a command".into())

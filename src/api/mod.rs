@@ -37,7 +37,12 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/events", get(events::events_ws))
         // servers
         .route("/servers", get(servers::list).post(servers::create))
-        .route("/servers/{id}", get(servers::get).patch(servers::update).delete(servers::delete))
+        .route(
+            "/servers/{id}",
+            get(servers::get)
+                .patch(servers::update)
+                .delete(servers::delete),
+        )
         .route("/servers/{id}/start", post(servers::start))
         .route("/servers/{id}/stop", post(servers::stop))
         .route("/servers/{id}/restart", post(servers::restart))
@@ -46,8 +51,14 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/servers/{id}/icon", post(servers::set_icon))
         .route("/servers/{id}/console", get(console::console_ws))
         .route("/servers/{id}/command", post(servers::command))
-        .route("/servers/{id}/properties", get(servers::get_properties).put(servers::put_properties))
-        .route("/servers/{id}/properties/raw", get(servers::get_properties_raw).put(servers::put_properties_raw))
+        .route(
+            "/servers/{id}/properties",
+            get(servers::get_properties).put(servers::put_properties),
+        )
+        .route(
+            "/servers/{id}/properties/raw",
+            get(servers::get_properties_raw).put(servers::put_properties_raw),
+        )
         .route("/servers/{id}/tailscale", post(servers::tailscale_tcp))
         // files
         .route("/servers/{id}/files", get(files::list))
@@ -59,16 +70,37 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/servers/{id}/files/rename", post(files::rename))
         .route("/servers/{id}/files/delete", post(files::delete_file))
         // backups
-        .route("/servers/{id}/backups", get(backups::list).post(backups::create))
-        .route("/servers/{id}/backups/{bid}/restore", post(backups::restore))
-        .route("/servers/{id}/backups/{bid}/download", get(backups::download))
+        .route(
+            "/servers/{id}/backups",
+            get(backups::list).post(backups::create),
+        )
+        .route(
+            "/servers/{id}/backups/{bid}/restore",
+            post(backups::restore),
+        )
+        .route(
+            "/servers/{id}/backups/{bid}/download",
+            get(backups::download),
+        )
         .route("/servers/{id}/backups/{bid}", delete(backups::remove))
         // players
-        .route("/servers/{id}/players/{list}", get(players::list).post(players::add))
-        .route("/servers/{id}/players/{list}/{name}", delete(players::remove))
+        .route(
+            "/servers/{id}/players/{list}",
+            get(players::list).post(players::add),
+        )
+        .route(
+            "/servers/{id}/players/{list}/{name}",
+            delete(players::remove),
+        )
         // schedules
-        .route("/servers/{id}/schedules", get(schedules::list).post(schedules::create))
-        .route("/servers/{id}/schedules/{sid}", patch(schedules::update).delete(schedules::remove))
+        .route(
+            "/servers/{id}/schedules",
+            get(schedules::list).post(schedules::create),
+        )
+        .route(
+            "/servers/{id}/schedules/{sid}",
+            patch(schedules::update).delete(schedules::remove),
+        )
         // mods/plugins
         .route("/servers/{id}/mods/search", get(mods::search))
         .route("/servers/{id}/mods/install", post(mods::install))
@@ -82,7 +114,10 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/java/{id}", delete(java::remove))
         .route("/java/required", get(java::required))
         // tailscale
-        .route("/tailscale", get(tailscale::status).post(tailscale::panel_serve))
+        .route(
+            "/tailscale",
+            get(tailscale::status).post(tailscale::panel_serve),
+        )
         // settings + audit
         .route("/settings", get(settings::get_all).put(settings::update))
         .route("/audit", get(audit::list))

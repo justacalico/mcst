@@ -33,7 +33,10 @@ impl Tailscale {
         tokio::time::timeout(CMD_TIMEOUT, Command::new(&self.bin).args(args).output())
             .await
             .unwrap_or_else(|_| {
-                Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "tailscale timed out"))
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "tailscale timed out",
+                ))
             })
     }
 
@@ -96,12 +99,7 @@ impl Tailscale {
     pub async fn serve_panel(&self, backend_port: u16, https_port: u16) -> anyhow::Result<()> {
         let target = format!("http://127.0.0.1:{backend_port}");
         let out = self
-            .run(&[
-                "serve",
-                "--bg",
-                &format!("--https={https_port}"),
-                &target,
-            ])
+            .run(&["serve", "--bg", &format!("--https={https_port}"), &target])
             .await?;
         if !out.status.success() {
             anyhow::bail!(
@@ -131,12 +129,7 @@ impl Tailscale {
     pub async fn serve_tcp(&self, server_port: u16, tailnet_port: u16) -> anyhow::Result<()> {
         let target = format!("tcp://127.0.0.1:{server_port}");
         let out = self
-            .run(&[
-                "serve",
-                "--bg",
-                &format!("--tcp={tailnet_port}"),
-                &target,
-            ])
+            .run(&["serve", "--bg", &format!("--tcp={tailnet_port}"), &target])
             .await?;
         if !out.status.success() {
             anyhow::bail!(

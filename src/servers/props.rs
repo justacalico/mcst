@@ -120,9 +120,8 @@ impl Properties {
 /// Sensible defaults for a brand-new server.properties.
 pub fn defaults(name: &str, port: i64) -> Properties {
     let mut p = Properties::default();
-    p.lines.push(Line::Comment(
-        "#Minecraft server properties".to_string(),
-    ));
+    p.lines
+        .push(Line::Comment("#Minecraft server properties".to_string()));
     for (k, v) in [
         ("server-port", port.to_string()),
         ("motd", format!("{name} — managed by mcst")),

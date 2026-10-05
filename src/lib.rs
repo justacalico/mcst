@@ -61,5 +61,3 @@ pub fn build_app(state: Arc<AppState>) -> Router {
 async fn api_not_found() -> crate::error::ApiError {
     crate::error::ApiError::not_found("unknown api endpoint")
 }
-
-

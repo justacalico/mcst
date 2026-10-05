@@ -142,7 +142,13 @@ pub fn sanitize_filename(name: &str) -> String {
         .unwrap_or_else(|| "download.jar".into());
     let clean: String = base
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' ') { c } else { '_' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_' | ' ') {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     if clean.is_empty() {
         "download.jar".into()
@@ -153,8 +159,7 @@ pub fn sanitize_filename(name: &str) -> String {
 
 /// Build the `mods`/`plugins` directory path for a server record.
 pub fn content_dir(_server_dir: &Path, server_type: &str) -> Result<&'static str> {
-    let t = crate::servers::types::ServerType::parse(server_type)
-        .context("unknown server type")?;
+    let t = crate::servers::types::ServerType::parse(server_type).context("unknown server type")?;
     if t.modrinth_facets().is_none() {
         bail!("this server type does not support mods/plugins");
     }

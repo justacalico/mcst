@@ -35,11 +35,10 @@ pub async fn login(
     State(s): State<Arc<AppState>>,
     Json(req): Json<LoginRequest>,
 ) -> ApiResult<impl axum::response::IntoResponse> {
-    let user = s
-        .db
-        .user_by_name(&req.username)
-        .await?
-        .ok_or_else(|| ApiError::unauthorized("invalid username or password"))?;
+    let user =
+        s.db.user_by_name(&req.username)
+            .await?
+            .ok_or_else(|| ApiError::unauthorized("invalid username or password"))?;
     if !password::verify(&req.password, &user.password_hash) {
         return Err(ApiError::unauthorized("invalid username or password"));
     }
@@ -59,7 +58,10 @@ pub async fn logout(
         s.db.delete_session(&t).await.ok();
     }
     Ok((
-        [(header::SET_COOKIE, format!("{SESSION_COOKIE}=; Path=/; HttpOnly; Max-Age=0"))],
+        [(
+            header::SET_COOKIE,
+            format!("{SESSION_COOKIE}=; Path=/; HttpOnly; Max-Age=0"),
+        )],
         Json(serde_json::json!({"ok": true})),
     ))
 }
@@ -83,11 +85,10 @@ pub async fn change_password(
     State(s): State<Arc<AppState>>,
     Json(req): Json<PasswordChange>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let row = s
-        .db
-        .user_by_id(&user.id)
-        .await?
-        .ok_or_else(|| ApiError::unauthorized("no account"))?;
+    let row =
+        s.db.user_by_id(&user.id)
+            .await?
+            .ok_or_else(|| ApiError::unauthorized("no account"))?;
     if !password::verify(&req.current, &row.password_hash) {
         return Err(ApiError::forbidden("current password is wrong"));
     }

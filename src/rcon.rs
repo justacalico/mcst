@@ -32,7 +32,7 @@ async fn read_packet(s: &mut TcpStream) -> Result<(i32, i32, Vec<u8>)> {
     let mut len_buf = [0u8; 4];
     s.read_exact(&mut len_buf).await?;
     let len = i32::from_le_bytes(len_buf) as usize;
-    if len < 10 || len > 1_048_576 {
+    if !(10..=1_048_576).contains(&len) {
         bail!("bad rcon packet length {len}");
     }
     let mut buf = vec![0u8; len];
@@ -57,10 +57,7 @@ impl Rcon {
         if id == ID_AUTH_FAILED {
             bail!("rcon authentication failed");
         }
-        Ok(Self {
-            stream,
-            counter: 2,
-        })
+        Ok(Self { stream, counter: 2 })
     }
 
     /// Run a command, returning the server's response text.
@@ -99,7 +96,10 @@ mod tests {
         let len = i32::from_le_bytes(p[0..4].try_into().unwrap()) as usize;
         assert_eq!(len, p.len() - 4);
         assert_eq!(i32::from_le_bytes(p[4..8].try_into().unwrap()), 7);
-        assert_eq!(i32::from_le_bytes(p[8..12].try_into().unwrap()), TYPE_COMMAND);
+        assert_eq!(
+            i32::from_le_bytes(p[8..12].try_into().unwrap()),
+            TYPE_COMMAND
+        );
         assert_eq!(&p[12..16], b"list");
         assert_eq!(&p[p.len() - 2..], &[0, 0]);
     }
@@ -160,7 +160,9 @@ mod tests {
     #[tokio::test]
     async fn run_helper() {
         let (port, _h) = fake_server().await;
-        let out = run(&format!("127.0.0.1:{port}"), "pw", "tps").await.unwrap();
+        let out = run(&format!("127.0.0.1:{port}"), "pw", "tps")
+            .await
+            .unwrap();
         assert_eq!(out, "ok: tps");
     }
 }

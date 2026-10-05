@@ -107,7 +107,11 @@ impl Config {
             .parse::<std::net::IpAddr>()
             .is_ok_and(|ip| ip.is_ipv6())
         {
-            format!("[{}]:{}", self.host.trim_start_matches('[').trim_end_matches(']'), self.port)
+            format!(
+                "[{}]:{}",
+                self.host.trim_start_matches('[').trim_end_matches(']'),
+                self.port
+            )
         } else {
             format!("{}:{}", self.host, self.port)
         }
@@ -256,7 +260,10 @@ mod tests {
         assert!(matches!(parse(&["-h"]).unwrap(), ConfigAction::Help));
         assert!(matches!(parse(&["--help"]).unwrap(), ConfigAction::Help));
         assert!(matches!(parse(&["-V"]).unwrap(), ConfigAction::Version));
-        assert!(matches!(parse(&["--version"]).unwrap(), ConfigAction::Version));
+        assert!(matches!(
+            parse(&["--version"]).unwrap(),
+            ConfigAction::Version
+        ));
         assert!(parse(&["--bogus"]).is_err());
         assert!(parse(&["stray"]).is_err());
     }

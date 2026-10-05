@@ -13,18 +13,23 @@ pub enum LogEvent {
     Joined(String),
     Left(String),
     /// `UUID of player Steve is xxxx`
-    Uuid { name: String, uuid: String },
+    Uuid {
+        name: String,
+        uuid: String,
+    },
     /// Output of the `list` command:
     /// `There are 2 of a max of 20 players online: Steve, Alex`
-    PlayerList { online: i64, max: i64, names: Vec<String> },
+    PlayerList {
+        online: i64,
+        max: i64,
+        names: Vec<String>,
+    },
     /// Nothing interesting.
     None,
 }
 
-static RE_DONE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"Done \([\d.]+s\)!?"#).unwrap());
-static RE_JOIN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(\w{1,16}) joined the game$").unwrap());
+static RE_DONE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"Done \([\d.]+s\)!?"#).unwrap());
+static RE_JOIN: Lazy<Regex> = Lazy::new(|| Regex::new(r"^(\w{1,16}) joined the game$").unwrap());
 static RE_LEAVE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(\w{1,16}) (?:left the game|lost connection)").unwrap());
 static RE_UUID: Lazy<Regex> =

@@ -50,7 +50,13 @@ pub async fn install(
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
     s.db.insert_java(req.major as i64, &path, true).await?;
-    s.db.audit(&user.username, "java_install", &format!("java {}", req.major)).await.ok();
+    s.db.audit(
+        &user.username,
+        "java_install",
+        &format!("java {}", req.major),
+    )
+    .await
+    .ok();
     Ok(Json(serde_json::json!({"ok": true, "path": path})))
 }
 
@@ -84,9 +90,6 @@ pub struct RequiredQuery {
 }
 
 /// Java major required for a Minecraft version.
-pub async fn required(
-    _u: AuthUser,
-    Query(q): Query<RequiredQuery>,
-) -> Json<serde_json::Value> {
+pub async fn required(_u: AuthUser, Query(q): Query<RequiredQuery>) -> Json<serde_json::Value> {
     Json(serde_json::json!({"major": crate::java::required_major(&q.mc_version)}))
 }

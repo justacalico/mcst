@@ -48,8 +48,13 @@ pub async fn create(
     if s.db.get_server(&id).await?.is_none() {
         return Err(ApiError::not_found("server not found"));
     }
-    crate::schedules::validate(&req.action, &req.payload, req.every_minutes, &req.daily_time)
-        .map_err(ApiError::bad_request)?;
+    crate::schedules::validate(
+        &req.action,
+        &req.payload,
+        req.every_minutes,
+        &req.daily_time,
+    )
+    .map_err(ApiError::bad_request)?;
     let row = ScheduleRow {
         id: Uuid::new_v4().to_string(),
         server_id: id,
@@ -72,13 +77,17 @@ pub async fn update(
     Path((_id, sid)): Path<(String, String)>,
     Json(req): Json<ScheduleReq>,
 ) -> ApiResult<Json<serde_json::Value>> {
-    let mut row = s
-        .db
-        .get_schedule(&sid)
-        .await?
-        .ok_or_else(|| ApiError::not_found("schedule not found"))?;
-    crate::schedules::validate(&req.action, &req.payload, req.every_minutes, &req.daily_time)
-        .map_err(ApiError::bad_request)?;
+    let mut row =
+        s.db.get_schedule(&sid)
+            .await?
+            .ok_or_else(|| ApiError::not_found("schedule not found"))?;
+    crate::schedules::validate(
+        &req.action,
+        &req.payload,
+        req.every_minutes,
+        &req.daily_time,
+    )
+    .map_err(ApiError::bad_request)?;
     row.name = req.name.unwrap_or(row.name);
     row.action = req.action;
     row.payload = req.payload;

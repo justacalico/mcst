@@ -95,7 +95,10 @@ impl Runtime {
 
     /// History snapshot + a live subscription.
     pub async fn subscribe(&self) -> (Vec<String>, broadcast::Receiver<String>) {
-        (self.history.read().await.iter().cloned().collect(), self.log_tx.subscribe())
+        (
+            self.history.read().await.iter().cloned().collect(),
+            self.log_tx.subscribe(),
+        )
     }
 
     pub fn set_stats(&self, cpu: f64, mem: u64) {
@@ -273,7 +276,9 @@ impl ServerManager {
         let rec = rt.record.read().await.clone();
         let dir = PathBuf::from(&rec.dir);
         if !dir.join(&rec.jar).exists()
-            && crate::servers::command::find_args_file(&dir).await.is_none()
+            && crate::servers::command::find_args_file(&dir)
+                .await
+                .is_none()
         {
             bail!("server jar not found — the install may be incomplete");
         }
@@ -432,7 +437,11 @@ impl ServerManager {
         self.start(id).await
     }
 
-    async fn on_process_exit(&self, rt: Arc<Runtime>, res: std::io::Result<std::process::ExitStatus>) {
+    async fn on_process_exit(
+        &self,
+        rt: Arc<Runtime>,
+        res: std::io::Result<std::process::ExitStatus>,
+    ) {
         let code = res.ok().and_then(|s| s.code());
         *rt.last_exit.write().await = code;
         *rt.stdin.lock().await = None;
@@ -468,7 +477,11 @@ impl ServerManager {
             ServerStatus::Stopped
         };
         self.set_status(&rt, status).await;
-        let _ = self.inner.db.audit("", "server_exit", &format!("{id} code={code:?}")).await;
+        let _ = self
+            .inner
+            .db
+            .audit("", "server_exit", &format!("{id} code={code:?}"))
+            .await;
     }
 
     /// Status + history subscription for the console WS.
@@ -513,8 +526,10 @@ impl ServerManager {
         let running: Vec<_> = {
             let mut v = Vec::new();
             for rt in rts {
-                if matches!(*rt.status.read().await, ServerStatus::Running | ServerStatus::Starting)
-                {
+                if matches!(
+                    *rt.status.read().await,
+                    ServerStatus::Running | ServerStatus::Starting
+                ) {
                     v.push(rt);
                 }
             }
@@ -546,12 +561,8 @@ impl ServerManager {
                     let cpu = p.cpu_usage() as f64;
                     let mem = p.memory();
                     rt.set_stats(cpu, mem);
-                    self.emit(PanelEvent::stats(
-                        &rt.record.read().await.id,
-                        cpu,
-                        mem,
-                    ))
-                    .await;
+                    self.emit(PanelEvent::stats(&rt.record.read().await.id, cpu, mem))
+                        .await;
                 }
             }
         }
@@ -605,10 +616,8 @@ impl ServerManager {
                     let idle = rt.last_nonempty.read().await.elapsed();
                     if idle >= Duration::from_secs(mins as u64 * 60) {
                         let id = rt.record.read().await.id.clone();
-                        rt.push_log(format!(
-                            "[mcst] no players for {mins}m — auto-stopping"
-                        ))
-                        .await;
+                        rt.push_log(format!("[mcst] no players for {mins}m — auto-stopping"))
+                            .await;
                         if let Err(e) = mgr.stop(&id).await {
                             tracing::warn!(server = %id, "empty-stop failed: {e}");
                         }
@@ -738,10 +747,10 @@ impl CreateServer {
         Ok(())
     }
 
-    pub fn to_record(&self, servers_dir: &PathBuf) -> ServerRecord {
+    pub fn to_record(&self, servers_dir: &std::path::Path) -> ServerRecord {
         let dir = servers_dir
             .join(command::slugify(&self.name))
-            .join(Uuid::new_v4().to_string().split('-').next().unwrap_or("x").to_string());
+            .join(Uuid::new_v4().to_string().split('-').next().unwrap_or("x"));
         ServerRecord {
             id: Uuid::new_v4().to_string(),
             name: self.name.clone(),
@@ -856,14 +865,16 @@ mod tests {
         });
         let rt = Arc::new(rt);
         tokio_test::block_on(async {
-            rt.handle_log_line("[t] [a/INFO]: Steve joined the game").await;
+            rt.handle_log_line("[t] [a/INFO]: Steve joined the game")
+                .await;
             assert!(rt.players.read().await.names.contains("Steve"));
             rt.handle_log_line("[t] [a/INFO]: Done (1.0s)!").await;
             assert_eq!(*rt.status.read().await, ServerStatus::Running);
             rt.handle_log_line("[t] [a/INFO]: There are 1 of a max of 20 players online: Steve")
                 .await;
             assert_eq!(rt.players.read().await.max, 20);
-            rt.handle_log_line("[t] [a/INFO]: Steve left the game").await;
+            rt.handle_log_line("[t] [a/INFO]: Steve left the game")
+                .await;
             assert!(rt.players.read().await.names.is_empty());
         });
     }

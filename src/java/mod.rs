@@ -15,8 +15,7 @@ pub struct JavaInstall {
     pub managed: bool,
 }
 
-static RE_VERSION: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"version "([0-9][0-9._]*)"#).unwrap());
+static RE_VERSION: Lazy<Regex> = Lazy::new(|| Regex::new(r#"version "([0-9][0-9._]*)"#).unwrap());
 
 /// Parse `java -version` stderr text → (major, full version).
 /// Handles both `1.8.0_422` and `17.0.12`/`21.0.3` schemes.
@@ -73,7 +72,12 @@ fn candidates(managed_dir: &Path) -> Vec<PathBuf> {
         }
     }
     // Common system locations.
-    for base in ["/usr/lib/jvm", "/usr/java", "C:\\Program Files\\Java", "C:\\Program Files\\Eclipse Adoptium"] {
+    for base in [
+        "/usr/lib/jvm",
+        "/usr/java",
+        "C:\\Program Files\\Java",
+        "C:\\Program Files\\Eclipse Adoptium",
+    ] {
         if let Ok(rd) = std::fs::read_dir(base) {
             for e in rd.flatten() {
                 for sub in ["bin/java", "bin/java.exe", "Contents/Home/bin/java"] {
@@ -124,12 +128,14 @@ fn platform() -> (&'static str, &'static str, &'static str) {
     };
     let arch = if cfg!(target_arch = "aarch64") {
         "aarch64"
-    } else if cfg!(target_arch = "x86_64") {
-        "x64"
     } else {
         "x64"
     };
-    let ext = if cfg!(target_os = "windows") { "zip" } else { "tar.gz" };
+    let ext = if cfg!(target_os = "windows") {
+        "zip"
+    } else {
+        "tar.gz"
+    };
     (os, arch, ext)
 }
 
@@ -202,7 +208,12 @@ pub fn pick(installs: &[JavaInstall], required: u32) -> Option<JavaInstall> {
     installs
         .iter()
         .find(|j| j.major == required)
-        .or_else(|| installs.iter().filter(|j| j.major > required).min_by_key(|j| j.major))
+        .or_else(|| {
+            installs
+                .iter()
+                .filter(|j| j.major > required)
+                .min_by_key(|j| j.major)
+        })
         .or_else(|| installs.iter().max_by_key(|j| j.major))
         .cloned()
 }
@@ -274,7 +285,9 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         let bin = d.path().join("jdk-21/bin");
         tokio::fs::create_dir_all(&bin).await.unwrap();
-        tokio::fs::write(bin.join("java"), b"#!/bin/sh\n").await.unwrap();
+        tokio::fs::write(bin.join("java"), b"#!/bin/sh\n")
+            .await
+            .unwrap();
         assert!(find_java_bin(d.path()).await.is_some());
         let empty = tempfile::tempdir().unwrap();
         assert!(find_java_bin(empty.path()).await.is_none());

@@ -10,8 +10,8 @@ pub fn split_args(s: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut in_quotes = false;
-    let mut chars = s.chars().peekable();
-    while let Some(c) = chars.next() {
+    let chars = s.chars().peekable();
+    for c in chars {
         match c {
             '"' => in_quotes = !in_quotes,
             c if c.is_whitespace() && !in_quotes => {
@@ -176,7 +176,14 @@ mod tests {
         assert_eq!(prog, "java");
         assert_eq!(
             args,
-            vec!["-Xmx4096M", "-Xms1024M", "-XX:+UseZGC", "-jar", "server.jar", "nogui"]
+            vec![
+                "-Xmx4096M",
+                "-Xms1024M",
+                "-XX:+UseZGC",
+                "-jar",
+                "server.jar",
+                "nogui"
+            ]
         );
     }
 
@@ -186,7 +193,9 @@ mod tests {
         let af = dir
             .path()
             .join("libraries/net/minecraftforge/forge/1.21-51.0.0/unix_args.txt");
-        tokio::fs::create_dir_all(af.parent().unwrap()).await.unwrap();
+        tokio::fs::create_dir_all(af.parent().unwrap())
+            .await
+            .unwrap();
         tokio::fs::write(&af, "-p x").await.unwrap();
         let (prog, args) = build_command(dir.path(), &rec("ignored")).await;
         assert_eq!(prog, "java");

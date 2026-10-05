@@ -32,11 +32,7 @@ pub async fn collect(data_dir: &std::path::Path) -> SystemStats {
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     sys.refresh_cpu_all();
 
-    let cpu_percent = sys
-        .cpus()
-        .iter()
-        .map(|c| c.cpu_usage() as f64)
-        .sum::<f64>()
+    let cpu_percent = sys.cpus().iter().map(|c| c.cpu_usage() as f64).sum::<f64>()
         / sys.cpus().len().max(1) as f64;
 
     // statvfs the data dir directly — enumerating all mounts can stall on
