@@ -16,7 +16,8 @@ flutter/.flutter-plugins-dependencies
 flutter/.packages
 flutter/build/
 flutter/.metadata
-frontend/dist/
+frontend/dist/*
+!frontend/dist/index.html
 flutter/coverage/
 coverage/
 
